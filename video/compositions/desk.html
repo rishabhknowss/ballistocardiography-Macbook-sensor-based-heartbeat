@@ -1,0 +1,411 @@
+<template>
+  <style>
+    @font-face { font-family: "Inter Tight"; font-weight: 400; src: url("assets/fonts/InterTight-400.woff2") format("woff2"); }
+    @font-face { font-family: "Inter Tight"; font-weight: 500; src: url("assets/fonts/InterTight-500.woff2") format("woff2"); }
+    @font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; src: url("assets/fonts/InstrumentSerif-Italic.woff2") format("woff2"); }
+
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      font-family: "Inter Tight", sans-serif;
+      color: #1d1d1f;
+      overflow: hidden;
+    }
+    #desk-gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #desk-fade {
+      position: absolute; left: 0; top: 0; width: 1800px; height: 600px; pointer-events: none;
+      background: radial-gradient(ellipse 100% 100% at 0% 0%, #ffffff 0%, #ffffff 46%, #ffffffcc 62%, #ffffff00 100%);
+    }
+
+    .desk-title {
+      position: absolute; left: 120px; top: 104px;
+      font-size: 84px; font-weight: 400; line-height: 1.02; letter-spacing: -0.05em;
+    }
+    .desk-title .ln { display: block; }
+    .desk-title .serif {
+      font-family: "Instrument Serif", serif; font-style: italic; letter-spacing: -0.02em;
+      font-size: 92px; color: #8e8e93;
+    }
+
+    .desk-label {
+      position: absolute; left: 0; top: 0;
+    }
+    .desk-label .box {
+      position: absolute; transform: translate(-50%, -100%);
+      background: #ffffff; border-radius: 16px; padding: 14px 20px;
+      box-shadow: 0 8px 24px -8px #0000001f, 0 2px 4px #00000008, 0 0 0 1px #00000008;
+      font-size: 28px; font-weight: 500; letter-spacing: -0.02em; white-space: nowrap;
+      display: flex; align-items: center; gap: 12px; opacity: 0;
+    }
+    .desk-label .box i { width: 12px; height: 12px; border-radius: 50%; background: #ff4b2b; display: block; }
+    .desk-label .box span { color: #6e6e73; font-weight: 400; }
+  </style>
+
+  <div data-hf-id="hf-wbaq" id="root" data-composition-id="desk" data-width="1920" data-height="1080" data-duration="19.6">
+    <canvas data-hf-id="hf-t9kr" id="desk-gl" width="1920" height="1080"></canvas>
+    <div data-hf-id="hf-0dpq" id="desk-fade" data-layout-ignore></div>
+
+    <h1 data-hf-id="hf-3rck" id="desk-t1" class="desk-title clip" data-start="0" data-duration="4" data-track-index="2">
+      <span data-hf-id="hf-0ct3" class="ln" id="desk-t1a">your macbook can feel</span>
+      <span data-hf-id="hf-lfvl" class="ln serif" id="desk-t1b">your heartbeat</span>
+    </h1>
+    <h1 data-hf-id="hf-62oo" id="desk-t2" class="desk-title clip" data-start="4.1" data-duration="5.9" data-track-index="2">
+      <span data-hf-id="hf-csrb" class="ln" id="desk-t2a">rest your wrists on it</span>
+      <span data-hf-id="hf-moc5" class="ln serif" id="desk-t2b">the chassis tilts</span>
+    </h1>
+    <h1 data-hf-id="hf-kfbl" id="desk-t3" class="desk-title clip" data-start="10.1" data-duration="4.5" data-track-index="2">
+      <span data-hf-id="hf-w35t" class="ln" id="desk-t3a">a hidden accelerometer</span>
+      <span data-hf-id="hf-lt6d" class="ln serif" id="desk-t3b">800 readings a second</span>
+    </h1>
+    <h1 data-hf-id="hf-s2jt" id="desk-t4" class="desk-title clip" data-start="14.7" data-duration="4.9" data-track-index="2">
+      <span data-hf-id="hf-oxtr" class="ln" id="desk-t4a">each heartbeat is</span>
+      <span data-hf-id="hf-dbmn" class="ln serif" id="desk-t4b">a tiny recoil</span>
+    </h1>
+
+    <div data-hf-id="hf-s6lp" id="desk-l1" class="desk-label clip" data-start="6.6" data-duration="3.4" data-track-index="3">
+      <div data-hf-id="hf-dn62" class="box" id="desk-l1box"><i data-hf-id="hf-wt6k"></i>wrists: on <span data-hf-id="hf-95u3">· 1.5 mg tilt</span></div>
+    </div>
+    <div data-hf-id="hf-eh8h" id="desk-l2" class="desk-label clip" data-start="11.4" data-duration="3.2" data-track-index="3">
+      <div data-hf-id="hf-64sd" class="box" id="desk-l2box"><i data-hf-id="hf-zeb8"></i>accelerometer <span data-hf-id="hf-ftb1">· inside the chassis</span></div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      const wipe = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% -20% 0)" }, { clipPath: "inset(0 0% -20% 0)", duration: 0.5, ease: "expo.out" }, at);
+      const out = (sel, at) => tl.to(sel, { clipPath: "inset(0 0% -20% 100%)", duration: 0.35, ease: "power3.in" }, at);
+      wipe("#desk-t1a", 0.15); wipe("#desk-t1b", 0.4); out("#desk-t1a", 3.55); out("#desk-t1b", 3.6);
+      wipe("#desk-t2a", 4.15); wipe("#desk-t2b", 6.6); out("#desk-t2a", 9.5); out("#desk-t2b", 9.55);
+      wipe("#desk-t3a", 10.15); wipe("#desk-t3b", 10.5); out("#desk-t3a", 14.1); out("#desk-t3b", 14.15);
+      wipe("#desk-t4a", 14.75); wipe("#desk-t4b", 15.1); out("#desk-t4a", 19.05); out("#desk-t4b", 19.1);
+      tl.fromTo("#desk-l1box", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2)" }, 6.65);
+      tl.to("#desk-l1box", { opacity: 0, duration: 0.2 }, 9.75);
+      tl.fromTo("#desk-l2box", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2)" }, 11.45);
+      tl.to("#desk-l2box", { opacity: 0, duration: 0.2 }, 14.35);
+      window.__timelines["desk"] = tl;
+    })();
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+    import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    const W = 1920, H = 1080;
+    const canvas = document.getElementById("desk-gl");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(W, H, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.55;
+
+    const camera = new THREE.PerspectiveCamera(32, W / H, 0.05, 100);
+
+    // ---------- light ----------
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xe9e3df, 0.9));
+    const key = new THREE.DirectionalLight(0xfff3e8, 2.2);
+    key.position.set(-4, 7, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -4; key.shadow.camera.right = 4;
+    key.shadow.camera.top = 4; key.shadow.camera.bottom = -4;
+    key.shadow.radius = 6; key.shadow.bias = -0.0004;
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdfe8ff, 0.7);
+    rim.position.set(4, 3, -5);
+    scene.add(rim);
+
+    // ---------- table ----------
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.22 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ---------- MacBook ----------
+    const BASE_W = 3.04, BASE_D = 2.15, BASE_T = 0.113;
+    const laptop = new THREE.Group();
+    scene.add(laptop);
+    const tiltPivot = new THREE.Group();           // tilts when weight lands
+    tiltPivot.position.set(0, 0, -BASE_D / 2);
+    laptop.add(tiltPivot);
+    const body = new THREE.Group();
+    body.position.set(0, 0, BASE_D / 2);
+    tiltPivot.add(body);
+
+    const alu = new THREE.MeshPhysicalMaterial({ color: 0xd4d5d8, metalness: 0.6, roughness: 0.45, transparent: true });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(BASE_W, BASE_T, BASE_D, 6, 0.05), alu);
+    base.position.y = BASE_T / 2;
+    base.castShadow = true;
+    body.add(base);
+
+    // keyboard
+    const keyMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.55, transparent: true });
+    const keyGeo = new RoundedBoxGeometry(0.155, 0.02, 0.15, 2, 0.02);
+    const rows = [14, 14, 13, 12, 12];
+    let nKeys = rows.reduce((a, b) => a + b, 0) + 1;
+    const keys = new THREE.InstancedMesh(keyGeo, keyMat, nKeys);
+    const m4 = new THREE.Matrix4();
+    let k = 0;
+    rows.forEach((n, r) => {
+      const pitch = 0.185, z = -0.95 + r * 0.19;
+      const width = n * pitch;
+      for (let i = 0; i < n; i++) {
+        const sx = (r === 2 && (i === 0 || i === n - 1)) || (r === 3 && (i === 0 || i === n - 1)) ? 1.6 : 1;
+        m4.makeScale(sx, 1, 1).setPosition(-width / 2 + pitch * (i + 0.5), BASE_T + 0.006, z);
+        keys.setMatrixAt(k++, m4);
+      }
+    });
+    m4.makeScale(6, 1, 1).setPosition(0, BASE_T + 0.006, -0.95 + 5 * 0.19);
+    keys.setMatrixAt(k++, m4);
+    keys.count = k;
+    body.add(keys);
+
+    // trackpad
+    const padMat = new THREE.MeshPhysicalMaterial({ color: 0xc9cacd, metalness: 0.5, roughness: 0.35, transparent: true });
+    const pad = new THREE.Mesh(new RoundedBoxGeometry(1.3, 0.004, 0.82, 2, 0.002), padMat);
+    pad.position.set(0, BASE_T + 0.001, 0.6);
+    body.add(pad);
+
+    // interior, revealed by the x-ray
+    const inner = new THREE.Group();
+    body.add(inner);
+    const boardMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.6 });
+    const cellMat = new THREE.MeshStandardMaterial({ color: 0x8d8e93, roughness: 0.5, metalness: 0.2 });
+    const board = new THREE.Mesh(new RoundedBoxGeometry(1.5, 0.018, 0.6, 2, 0.008), boardMat);
+    board.position.set(0.1, 0.035, -0.62);
+    inner.add(board);
+    [-0.9, -0.3, 0.3, 0.9].forEach(x => {
+      const c = new THREE.Mesh(new RoundedBoxGeometry(0.52, 0.04, 0.95, 2, 0.015), cellMat);
+      c.position.set(x, 0.035, 0.45);
+      inner.add(c);
+    });
+    const smallMat = new THREE.MeshStandardMaterial({ color: 0x47474b, roughness: 0.5 });
+    [[-0.35, -0.6, 0.24, 0.16], [-0.05, -0.72, 0.14, 0.12], [0.55, -0.55, 0.18, 0.2]].forEach(([x, z, w, d]) => {
+      const c = new THREE.Mesh(new RoundedBoxGeometry(w, 0.02, d, 2, 0.006), smallMat);
+      c.position.set(x, 0.052, z);
+      inner.add(c);
+    });
+    const CHIP = new THREE.Vector3(0.28, 0.05, -0.52);
+    const chip = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.022, 0.09, 2, 0.006), new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 }));
+    chip.position.copy(CHIP);
+    inner.add(chip);
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0xff4b2b, transparent: true });
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.014, 16, 12), ledMat);
+    led.position.set(CHIP.x, CHIP.y + 0.016, CHIP.z);
+    inner.add(led);
+    inner.visible = false;
+
+    // lid + screen
+    const hinge = new THREE.Group();
+    hinge.position.set(0, BASE_T, -BASE_D / 2);
+    hinge.rotation.x = -0.314;                 // opened 108°
+    body.add(hinge);
+    const lid = new THREE.Mesh(new RoundedBoxGeometry(BASE_W, 2.12, 0.05, 6, 0.024), alu);
+    lid.position.set(0, 1.06, -0.03);
+    lid.castShadow = true;
+    hinge.add(lid);
+    const bezel = new THREE.Mesh(new THREE.PlaneGeometry(2.98, 2.06), new THREE.MeshBasicMaterial({ color: 0x0c0c0e }));
+    bezel.position.set(0, 1.06, -0.004);
+    hinge.add(bezel);
+    const tex = new THREE.TextureLoader().load("assets/screen.jpg");
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const SCREEN_ASPECT = 2.84 / 1.82, IMG_ASPECT = 1524 / 784;
+    tex.repeat.set(SCREEN_ASPECT / IMG_ASPECT, 1);
+    tex.offset.set((1 - SCREEN_ASPECT / IMG_ASPECT) / 2, 0);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.84, 1.82), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+    screen.position.set(0, 1.08, -0.002);
+    hinge.add(screen);
+
+    // ---------- hands (WebXR generic-hand models, MIT, Amazon) ----------
+    const skin = new THREE.MeshPhysicalMaterial({
+      color: 0xc98a6c, roughness: 0.52, sheen: 0.6, sheenColor: new THREE.Color(0xff9c80),
+      sheenRoughness: 0.45, clearcoat: 0.05, clearcoatRoughness: 0.6, transparent: true,
+    });
+    const REST_Y = BASE_T + 0.07;
+    const handR = new THREE.Group(), handL = new THREE.Group();
+    handR.position.set(0.8, REST_Y, 0.82); handR.rotation.y = 0.16;
+    handL.position.set(-0.8, REST_Y, 0.82); handL.rotation.y = -0.16;
+    body.add(handR, handL);
+    const handRest = [handR.position.clone(), handL.position.clone()];
+    // Rest pose in the file: fingers along -Y, palm facing -X (right) / +X (left), thumb toward -Z.
+    // Map to: fingers toward the screen (-Z), palm down (-Y), thumbs toward the trackpad.
+    const BASIS = {
+      right: new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)),
+      left: new THREE.Matrix4().makeBasis(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0)),
+    };
+    const CURL = { "phalanx-proximal": 0.32, "phalanx-intermediate": 0.42, "phalanx-distal": 0.26 };
+    const loader = new GLTFLoader();
+    [["right", handR, 1], ["left", handL, -1]].forEach(([name, holder, side]) => {
+      loader.load(`assets/hands/${name}.glb`, gltf => {
+        const model = gltf.scene;
+        model.scale.setScalar(10.5);
+        const rot = new THREE.Group();
+        rot.quaternion.setFromRotationMatrix(BASIS[name]);
+        rot.add(model);
+        holder.add(rot);
+        model.traverse(o => {
+          if (o.isMesh) { o.material = skin; o.castShadow = true; o.frustumCulled = false; }
+          // Relax the fingers: curl each joint toward the palm around the bone's own bend axis.
+          if (o.isBone) {
+            const key = Object.keys(CURL).find(k => o.name.endsWith(k));
+            if (key && !o.name.startsWith("thumb")) o.rotateOnAxis(new THREE.Vector3(1, 0, 0), -CURL[key] * side * 0);
+          }
+        });
+        // Put the wrist joint exactly on the holder's origin.
+        holder.updateMatrixWorld(true);
+        const wrist = model.getObjectByName("wrist");
+        const w = new THREE.Vector3(); wrist.getWorldPosition(w); holder.worldToLocal(w);
+        rot.position.sub(w);
+        // Forearm running back from the wrist, off the front edge.
+        const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.205, 2.0, 10, 24), skin);
+        arm.rotation.x = Math.PI / 2 - 0.1;
+        arm.scale.set(1.15, 1, 0.78);
+        arm.position.set(0, -0.06, 1.12);
+        arm.castShadow = true;
+        holder.add(arm);
+        handsLoaded++;
+      });
+    });
+    let handsLoaded = 0;
+
+    // ---------- sensor trace ribbon (real recorded data) ----------
+    const wave = window.__heartbeatWave || [];
+    const N = 260;
+    const ribbonGeo = new THREE.BufferGeometry();
+    const pos = new Float32Array(N * 2 * 3);
+    ribbonGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const idx = [];
+    for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    ribbonGeo.setIndex(idx);
+    const ribbon = new THREE.Mesh(ribbonGeo, new THREE.MeshBasicMaterial({ color: 0xff4b2b, side: THREE.DoubleSide, toneMapped: false }));
+    ribbon.frustumCulled = false;
+    body.add(ribbon);
+
+    // ---------- helpers ----------
+    const clamp01 = x => Math.min(1, Math.max(0, x));
+    const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    const easeOut3 = x => 1 - Math.pow(1 - x, 3);
+    const span = (t, a, b) => clamp01((t - a) / (b - a));
+
+    // Camera: positions and targets through keyframes, eased per segment, never stopping mid-film.
+    const KEYS = [
+      [0.0,  [3.9, 3.1, 5.4],   [0, 0.72, -0.25]],
+      [2.6,  [3.3, 2.75, 4.7],  [0, 0.62, -0.1]],
+      [4.8,  [2.4, 2.3, 4.0],   [0, 0.36, 0.2]],
+      [8.0,  [1.3, 1.25, 1.5],  [0.28, 0.07, -0.45]],
+      [9.6,  [0.95, 1.1, 1.15], [0.2, 0.45, -0.65]],
+      [11.3, [0.25, 1.28, 0.55],[0, 1.08, -1.3]],
+      [12.5, [0.0, 1.33, -0.6], [0, 1.12, -1.42]],
+    ].map(([t, p, l]) => ({ t, p: new THREE.Vector3(...p), l: new THREE.Vector3(...l) }));
+    const posCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k.p), false, "centripetal");
+    const lookCurve = new THREE.CatmullRomCurve3(KEYS.map(k => k.l), false, "centripetal");
+    function camAt(t) {
+      let i = 0;
+      while (i < KEYS.length - 2 && t >= KEYS[i + 1].t) i++;
+      const a = KEYS[i], b = KEYS[i + 1];
+      let u = clamp01((t - a.t) / (b.t - a.t));
+      if (i === 0) u = 0.5 * ease(u * 0.5) * 2;                 // gentle start
+      const s = (i + u) / (KEYS.length - 1);
+      return { p: posCurve.getPoint(s), l: lookCurve.getPoint(s) };
+    }
+
+    const v3 = new THREE.Vector3();
+    function project(local, el) {
+      v3.copy(local); body.localToWorld(v3); v3.project(camera);
+      el.style.left = `${(v3.x * 0.5 + 0.5) * W}px`;
+      el.style.top = `${(-v3.y * 0.5 + 0.5) * H}px`;
+    }
+
+    // The trace runs from the chip, up through the keyboard, into the screen.
+    const P = [CHIP.clone().setY(0.08), new THREE.Vector3(0.3, 0.55, -0.55), new THREE.Vector3(0.12, 0.95, -0.95), new THREE.Vector3(0, 1.1, -1.28)];
+    const traceCurve = new THREE.CubicBezierCurve3(...P);
+    const camLocal = new THREE.Vector3(), tan = new THREE.Vector3(), side = new THREE.Vector3(), pt = new THREE.Vector3(), view = new THREE.Vector3();
+    function drawRibbon(t, tNew) {
+      const grow = easeOut3(span(t, 8.7, 10.6));
+      ribbon.visible = grow > 0.001 && wave.length > 0;
+      if (!ribbon.visible) return;
+      const head = 300 + Math.floor((tNew - 14.8) * 100);
+      camLocal.copy(camera.position); body.worldToLocal(camLocal);
+      const shown = Math.max(2, Math.floor(N * grow));
+      for (let i = 0; i < N; i++) {
+        const u = Math.min(i, shown - 1) / (N - 1);
+        traceCurve.getPoint(u, pt);
+        traceCurve.getTangent(u, tan);
+        view.copy(camLocal).sub(pt).normalize();
+        side.crossVectors(tan, view).normalize();
+        const sample = wave[Math.max(0, head - i) % wave.length] || 0;
+        const amp = 0.075 * Math.max(-1.3, Math.min(1.3, sample)) * (0.25 + 0.75 * clamp01(i / 30));
+        pt.addScaledVector(side, amp);
+        const w = 0.0075;
+        pos.set([pt.x + side.x * w, pt.y + side.y * w, pt.z + side.z * w], i * 6);
+        pos.set([pt.x - side.x * w, pt.y - side.y * w, pt.z - side.z * w], i * 6 + 3);
+      }
+      ribbonGeo.attributes.position.needsUpdate = true;
+    }
+
+    const l1 = document.getElementById("desk-l1box"), l2 = document.getElementById("desk-l2box");
+
+    // The scene was authored over 12.5 s and re-timed to the voiceover (19.6 s).
+    const WARP = [[0, 0], [4.0, 2.6], [10.0, 5.6], [14.6, 9.0], [19.6, 12.5]];
+    function warp(t) {
+      for (let i = 1; i < WARP.length; i++) {
+        const [n0, o0] = WARP[i - 1], [n1, o1] = WARP[i];
+        if (t <= n1) return o0 + (o1 - o0) * clamp01((t - n0) / (n1 - n0));
+      }
+      return 12.5;
+    }
+
+    function renderAt(tNew) {
+      const t = warp(tNew);
+      // hands land 4.3 → 6.5 (film time, under "rest your wrists on it")
+      const land = easeOut3(span(tNew, 4.3, 6.5));
+      [handR, handL].forEach((h, i) => {
+        h.visible = tNew >= 4.2;
+        h.position.copy(handRest[i]).add(new THREE.Vector3(0.6 * (i ? -1 : 1) * (1 - land), 0.9 * (1 - land), 3.2 * (1 - land)));
+        h.rotation.x = -0.35 * (1 - land);
+      });
+      // weight lands → the chassis tilts (exaggerated so it reads)
+      tiltPivot.rotation.x = 0.014 * easeOut3(span(tNew, 6.35, 6.75));
+
+      // x-ray 5.9 → 6.8
+      const xr = ease(span(t, 5.9, 6.8));
+      alu.opacity = 1 - 0.84 * xr;
+      alu.depthWrite = xr < 0.05;
+      keyMat.opacity = 1 - 0.8 * xr;
+      padMat.opacity = 1 - 0.85 * xr;
+      skin.opacity = 1 - 0.8 * xr;
+      skin.depthWrite = xr < 0.05;
+      inner.visible = xr > 0.01;
+      ledMat.opacity = 0.55 + 0.45 * Math.max(0, Math.sin(tNew * 7.4));
+
+      const c = camAt(t);
+      camera.position.copy(c.p);
+      camera.lookAt(c.l);
+      camera.updateMatrixWorld();
+      drawRibbon(t, tNew);
+
+      project(new THREE.Vector3(0, BASE_T + 0.32, 0.95), l1);
+      project(new THREE.Vector3(CHIP.x, CHIP.y + 0.09, CHIP.z), l2);
+      renderer.render(scene, camera);
+    }
+
+    // The runtime waits for the screen texture via THREE.DefaultLoadingManager; redraw once it lands.
+    THREE.DefaultLoadingManager.onLoad = () => renderAt(window.__hfThreeTime || 0);
+
+    window.addEventListener("hf-seek", e => renderAt(e.detail.time));
+    renderAt(window.__hfThreeTime || 0);
+  </script>
+</template>

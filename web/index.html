@@ -217,7 +217,7 @@
 
 <section class="hero">
   <div class="title">
-    <h1>my macbook can feel <span class="serif">my heartbeat</span></h1>
+    <h1>your macbook can feel <span class="serif">your heartbeat</span></h1>
     <p class="lede">
       There's an accelerometer hidden inside every Apple Silicon MacBook. Rest your
       wrists on the palm rest, go still, and see if it catches your pulse.
@@ -229,7 +229,7 @@
     <canvas id="wave"></canvas>
     <div class="floor" id="floor"></div>
     <div class="heart-wrap"><canvas id="heart"></canvas></div>
-    <div class="tag"><span><b id="rate">— Hz</b></span><span>1–10 Hz band</span><span id="gain">±— µg</span><span id="sync">heart: resting beat</span></div>
+    <div class="tag"><span><b id="rate">— Hz</b></span><span>1–10 Hz band</span><span id="gain">±— µg</span><span id="hands">wrists: —</span><span id="sync">heart: resting beat</span></div>
     <div class="hold" id="hold">✋ <span>Hold still</span> <em id="holdWhy">too much motion</em></div>
 
     <div class="cards">
@@ -313,6 +313,12 @@
 
   const S = { t: [], bp: [[], [], []], env: [[], [], []] };
   let motionMs = 0;
+  // Resting wrists on the palm rest tilts the chassis: about -1.5 mg on Y on a flat
+  // table (much more on a soft or uneven surface). Track a slow tilt estimate and
+  // compare it with a hands-off reference.
+  const HANDS_ON = 0.8, HANDS_OFF = 0.4;   // mg — flat-table noise is about ±0.1 mg
+  const tilt = { x: null, y: null }, ref = { x: null, y: null };
+  let handsOn = false, tiltDelta = 0;
   const beats = [];
   let bpm = null, quality = 0;
 
@@ -343,7 +349,11 @@
       }
       const a = Math.exp(-1 / (fs * 0.4));
       motionMs = a * motionMs + (1 - a) * m2;
+      const at = Math.exp(-1 / (fs * 0.5));
+      tilt.x = tilt.x == null ? x : at * tilt.x + (1 - at) * x;
+      tilt.y = tilt.y == null ? y : at * tilt.y + (1 - at) * y;
       warm++;
+      updateHands();
     }
     const cut = S.t.length - Math.round(KEEP * fs);
     if (cut > fs) {
@@ -354,6 +364,22 @@
       const r = (rateWin.length - 1) / (rateWin[rateWin.length - 1] - rateWin[0]);
       fsMeasured = r;
       if (Math.abs(r - fs) / fs > 0.12) { fs = r; buildFilters(); warm = 0; }
+    }
+  }
+
+  function updateHands() {
+    if (warm < fs * 1.5) return;
+    if (ref.y == null) { ref.x = tilt.x; ref.y = tilt.y; return; }
+    const dx = (tilt.x - ref.x) * 1000, dy = (tilt.y - ref.y) * 1000;
+    tiltDelta = Math.hypot(dx, dy);
+    if (!handsOn && dy < -HANDS_ON) handsOn = true;
+    else if (handsOn && dy > -HANDS_OFF) handsOn = false;
+    // A big jump the other way means the reference was taken with hands on.
+    if (!handsOn && dy > HANDS_ON) { ref.x = tilt.x; ref.y = tilt.y; }
+    // Follow slow drift while nobody is touching it.
+    if (!handsOn && motionMg() < MOTION_WARN) {
+      const k = 1 / (fs * 20);
+      ref.x += (tilt.x - ref.x) * k; ref.y += (tilt.y - ref.y) * k;
     }
   }
 
@@ -387,6 +413,7 @@
   }
 
   let lastAnalysis = 0, axisScores = [0, 0, 0];
+  const history = [];
   function analyze() {
     const now = S.t[S.t.length - 1];
     if (now == null || now - lastAnalysis < 0.5) return;
@@ -399,11 +426,16 @@
     }
     const r = res[axis];
     const still = motionMg() < MOTION_WARN;
-    quality = still && warm > fs * 3 ? Math.min(1, r.score / 0.6) : 0;
-    if (quality > 0.45 && r.period) {
-      const est = 60 / r.period;
+    // Empty-desk vibration alone scored up to ~0.4 in testing, so map 0.4 → 0 %.
+    quality = handsOn && still && warm > fs * 3 ? Math.max(0, Math.min(1, (r.score - 0.4) / 0.35)) : 0;
+    history.push(quality > 0.4 && r.period ? r.period : null);
+    if (history.length > 3) history.shift();
+    const ps = history.filter(Boolean);
+    const consistent = ps.length === 3 && (Math.max(...ps) - Math.min(...ps)) / Math.min(...ps) < 0.1;
+    if (consistent) {
+      const est = 60 / (ps.reduce((a, b) => a + b) / 3);
       bpm = bpm == null ? est : bpm + 0.35 * (est - bpm);
-    } else if (quality < 0.2) {
+    } else if (!handsOn || quality < 0.2) {
       bpm = null;
     }
     detectBeats(r.period);
@@ -438,9 +470,9 @@
   let syncedUntil = 0;
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function onBeat(tb) {
-    if (motionMg() >= MOTION_WARN) return;
+    if (!handsOn || motionMg() >= MOTION_WARN) return;
     // Re-align the heart's phase to real detections
-    if (quality > 0.35 && !reduceMotion) {
+    if (bpm && quality > 0.4 && !reduceMotion) {
       const now = performance.now() / 1000;
       if (now - lastBeat > 0.45 * beatPeriod) heartBeat();
       syncedUntil = performance.now() + 2200;
@@ -707,7 +739,7 @@
     if (!prog) return null;
     const now = nowMs / 1000;
     // Resting beat until the sensor locks a rate, then pump at that rate.
-    const locked = connected && bpm && quality > 0.45;
+    const locked = connected && handsOn && bpm;
     const synced = locked || nowMs < syncedUntil;
     beatPeriod = locked ? 60 / Math.min(150, Math.max(40, bpm)) : 1;
     if (!reduceMotion && now - lastBeat >= beatPeriod) heartBeat();
@@ -864,12 +896,13 @@
     $("quality").innerHTML = `${connected && warm > fs * 3 ? q : "—"}<small>%</small>`;
     $("qualityBar").style.width = `${q}%`;
     $("qualityBar").style.background = quality > 0.45 ? BRAND : FG3;
-    $("qualityWord").textContent = !connected ? "—" : warm < fs * 3 ? "warming up" : quality > 0.7 ? "rhythmic" : quality > 0.45 ? "faint rhythm" : "searching";
+    $("qualityWord").textContent = !connected ? "—" : !handsOn ? "no wrists" : warm < fs * 3 ? "warming up" : quality > 0.7 ? "rhythmic" : quality > 0.45 ? "faint rhythm" : "searching";
 
-    const b = $("bpm"), ok = bpm && quality > 0.45;
+    const b = $("bpm"), ok = handsOn && bpm;
     b.innerHTML = `${ok ? Math.round(bpm) : "—"}<small>bpm</small>`;
     b.classList.toggle("dim", !ok);
-    $("bpmNote").textContent = !connected ? "waiting for the helper" : ok ? "estimate · not medical" : moving ? "waiting for stillness" : "listening…";
+    $("bpmNote").textContent = !connected ? "waiting for the helper" : !handsOn ? "rest your wrists on the palm rest" : ok ? "estimate · not medical" : moving ? "waiting for stillness" : "listening for a steady rhythm…";
+    $("hands").textContent = !connected || ref.y == null ? "wrists: —" : handsOn ? `wrists: on (${tiltDelta.toFixed(1)} mg tilt)` : "wrists: off";
 
     $("rate").textContent = fsMeasured ? `${Math.round(fsMeasured)} Hz` : "— Hz";
     if (axisMode === "auto") document.querySelector('.seg [data-axis="auto"]').textContent = `Auto · ${"XYZ"[axis]}`;
@@ -907,9 +940,9 @@
     g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
     g.textAlign = "center";
     g.fillStyle = css("--fg"); g.font = `400 62px ${css("--sans")}`;
-    g.fillText("my macbook can feel", W / 2 - 150, 120);
+    g.fillText("your macbook can feel", W / 2 - 170, 120);
     g.fillStyle = FG3; g.font = `italic 68px ${css("--serif")}`;
-    g.fillText("my heartbeat", W / 2 + 330, 120);
+    g.fillText("your heartbeat", W / 2 + 340, 120);
     g.drawImage(wave, 0, 170, W, 620);
     const hs = 600; g.drawImage(heartCanvas, (W - hs) / 2, 180, hs, hs);
     g.fillStyle = FG3; g.font = `24px ${css("--sans")}`;

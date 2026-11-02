@@ -1,0 +1,13 @@
+{
+  "lang": "en",
+  "speed": 1.05,
+  "lines": [
+    { "id": "l1", "text": "Your MacBook can feel your heartbeat. Kind of." },
+    { "id": "l2", "text": "Rest your wrists on it, and the whole laptop leans. About one and a half thousandths of a g." },
+    { "id": "l3", "text": "There's a hidden motion sensor in there, reading eight hundred times a second." },
+    { "id": "l4", "text": "Every beat of your heart gives your body a tiny kick. We try to catch it." },
+    { "id": "l5", "text": "Some days the rhythm shows up. Honestly? Most days, the desk wins." },
+    { "id": "l6", "text": "MacBook Heartbeat. Open source, and very experimental." }
+  ],
+  "bgm": { "mode": "retrieve", "query": "minimal warm electronic pulse, curious, light, 100 bpm, building gently, no vocals" }
+}

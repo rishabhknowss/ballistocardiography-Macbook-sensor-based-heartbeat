@@ -9,7 +9,9 @@ program that reads the sensor and a web page that draws what it sees.
 
 **Live page:** https://macbook-heartbeat-rishabh.vercel.app (it needs the helper running on your Mac, see below)
 
-![screenshot](docs/screenshot.jpg)
+[![macbook heartbeat, 22-second demo](docs/demo.gif)](docs/demo.mp4)
+
+<sub>30-second demo with sound: [MP4](docs/demo.mp4) (the GIF above is silent). Made with [HyperFrames](https://hyperframes.heygen.com), source in [`video/`](video). The voiceover and music are from HeyGen and the hand models are the MIT-licensed WebXR generic hands. The red trace is a real recording from the flat-table test below. The 3D heart is an illustration.</sub>
 
 > This is a toy. It is not a medical device and the BPM number is not a real
 > heart-rate measurement. Most of what you see on the waveform is your desk, your
@@ -128,33 +130,63 @@ the ventricles shorten and twist, and the aorta bulges as the pressure wave arri
 
 "Save snapshot" exports a 1600×900 PNG of the heart and the current waveform.
 
-## Why it's unreliable
+## What I actually measured
 
-These are the numbers from my desk:
+I ran two controlled 40-second recordings: about 10 s hands off, then about 20 s with both
+wrists resting still on the palm rest, then hands off again.
+
+**Detecting wrists works.** Weight on the palm rest tilts the chassis, which shows up as
+a shift in the steady gravity reading:
+
+| surface | tilt shift with wrists on | drift with no hands |
+|---|---|---|
+| soft / uneven | 20–30 mg (Y and X) | ~1 mg |
+| flat, hard table | ~1.5 mg (Y) | ~0.1 mg |
+
+So the page only looks for a pulse once it sees that tilt (`wrists: on`). Before I
+added that check, it happily reported a BPM for an empty desk.
+
+**Detecting the heartbeat didn't, at least not on my desk.** I scored how strongly the
+filtered signal repeats at 40–150 bpm (autocorrelation of its energy envelope):
+
+| window (flat table) | best single axis | X+Y combined |
+|---|---|---|
+| hands off | 0.31 @ 81 bpm | **0.67 @ 88 bpm** |
+| wrists on | 0.22–0.36 | 0.15–0.38 |
+
+The strongest "rhythm" in the recording came from the hands-off section, which means
+it comes from the room or the laptop itself (fans, the building, the table), not a
+pulse. With wrists on, there's a faint, inconsistent hint around 75–85 bpm, but nothing
+that stands out from the background.
+
+Because of that, the page is strict. It shows a BPM only when your wrists are detected,
+you're still, the rhythm score is above the empty-desk level, and the period agrees
+across three analysis windows in a row. In practice, that means it usually shows "—".
+That's the honest result.
+
+## Why it's hard
+
+The sensor itself is sensitive enough: it reports steps of about 15 µg. The problem
+is everything else that shakes the laptop:
 
 | | rough size in 1–10 Hz |
 |---|---|
-| laptop on a desk, nobody touching it | 0.7–4 mg |
-| wrists resting, typing nearby, normal breathing | several mg |
+| flat table, nobody touching it | ~250 µg |
+| soft or uneven surface | 300–1000 µg, with rocking |
+| moving your hands / typing | several mg |
 | heartbeat recoil through the wrists (expected) | tens of µg |
 
-The sensor is fine-grained enough. The problem is that the heartbeat is 10 to 100
-times smaller than ordinary vibration in a room, and it falls in the same frequency
-range. The filters can't separate them, so the waveform mostly shows everything else
-moving.
+The heartbeat is smaller than the background vibration and sits in the same frequency
+range, so filtering can't pull them apart.
 
-The autocorrelation and beat averaging help when you're very still. But it's easy to
-lock onto the wrong thing, like a fan, footsteps or your own breathing, and get a
-confident-looking BPM that's wrong. So treat the number as a guess.
-
-Things that would probably help, if anyone wants to take it further:
+Things that might help if someone wants to push further:
 
 - Use the gyro as well. Wrist recoil may show up better as tiny rotations.
 - Use the trackpad's Force Touch pressure, which reads right under your fingers.
-- Compare against a real reference, like an Apple Watch or a finger pulse oximeter,
-  instead of guessing.
-- Replace autocorrelation with something adaptive, such as template matching on the
-  averaged beat.
+- Record a reference at the same time (an Apple Watch or a finger pulse oximeter) and
+  check whether anything in the signal actually lines up with real beats.
+- Subtract the room's vibration measured just before your wrists land, instead of
+  relying on a fixed band-pass.
 
 ## Layout
 
@@ -163,6 +195,7 @@ Sources/heartbeat.swift   sensor reader + tiny HTTP/SSE server
 web/index.html            the whole front end (DSP, waveform, WebGL heart), no build step
 Makefile                  make / make run / make clean
 vercel.json               serves web/ as a static site
+video/                    the demo film (HyperFrames: Three.js desk scene, the heart shader, end card)
 ```
 
 Helper flags: `--port 8787`, `--web ./web`, `--no-open`.

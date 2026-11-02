@@ -1,0 +1,295 @@
+<template>
+  <style>
+    @font-face { font-family: "Inter Tight"; font-weight: 400; src: url("assets/fonts/InterTight-400.woff2") format("woff2"); }
+    @font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; src: url("assets/fonts/InstrumentSerif-Italic.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; background: #ffffff; overflow: hidden; font-family: "Inter Tight", sans-serif; color: #1d1d1f; }
+    #heart-wave { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #heart-gl { position: absolute; left: 830px; top: 40px; width: 1000px; height: 1000px; display: block; }
+    .heart-title { position: absolute; left: 120px; top: 150px; font-size: 80px; font-weight: 400; line-height: 1.02; letter-spacing: -0.05em; width: 760px; }
+    .heart-title .ln { display: block; }
+    .heart-title .serif { font-family: "Instrument Serif", serif; font-style: italic; letter-spacing: -0.02em; font-size: 92px; color: #8e8e93; }
+    #heart-foot { position: absolute; left: 120px; bottom: 96px; font-size: 28px; color: #8e8e93; }
+  </style>
+  <div data-hf-id="hf-hdqh" id="root" data-composition-id="heart" data-width="1920" data-height="1080" data-duration="5.6">
+    <canvas data-hf-id="hf-qkok" id="heart-wave" width="1920" height="1080"></canvas>
+    <canvas data-hf-id="hf-gmrl" id="heart-gl" width="1000" height="1000"></canvas>
+    <h1 data-hf-id="hf-4ziq" id="heart-t1" class="heart-title clip" data-start="0" data-duration="2.1" data-track-index="2">
+      <span data-hf-id="hf-orhr" class="ln" id="heart-t1a">it listens</span>
+      <span data-hf-id="hf-r58v" class="ln serif" id="heart-t1b">for your pulse</span>
+    </h1>
+    <h1 data-hf-id="hf-8ltc" id="heart-t2" class="heart-title clip" data-start="2.15" data-duration="3.45" data-track-index="2">
+      <span data-hf-id="hf-wr5e" class="ln" id="heart-t2a">sometimes it finds one.</span>
+      <span data-hf-id="hf-q5wk" class="ln serif" id="heart-t2b">often it doesn't.</span>
+    </h1>
+    <p data-hf-id="hf-gd6v" id="heart-foot" class="clip" data-start="0.4" data-duration="5.2" data-track-index="3">illustration · real sensor trace from a flat-table test</p>
+  </div>
+
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      const wipe = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% -20% 0)" }, { clipPath: "inset(0 0% -20% 0)", duration: 0.5, ease: "expo.out" }, at);
+      const out = (sel, at) => tl.to(sel, { clipPath: "inset(0 0% -20% 100%)", duration: 0.35, ease: "power3.in" }, at);
+      wipe("#heart-t1a", 0.3); wipe("#heart-t1b", 0.55); out("#heart-t1a", 1.7); out("#heart-t1b", 1.75);
+      wipe("#heart-t2a", 2.2); wipe("#heart-t2b", 3.4);
+      tl.fromTo("#heart-foot", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.4);
+      window.__timelines["heart"] = tl;
+    })();
+  </script>
+
+  <script>
+    (() => {
+      const DUR = 5.6, START = 19.6;
+      // hf-seek carries the film's time; convert to this scene's clock.
+      const local = t => (t >= DUR ? t - START : t);
+
+      const gl = document.getElementById("heart-gl").getContext("webgl2", { premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: true });
+      const VS = `#version 300 es
+      in vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
+      const FS = `#version 300 es
+  precision highp float;
+  uniform vec2 uRes;
+  uniform float uTime, uVent, uAtria, uEject, uLife;
+  uniform vec2 uRot;
+  out vec4 outColor;
+
+  mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+  float smin(float a, float b, float k){ float h=clamp(.5+.5*(b-a)/k,0.,1.); return mix(b,a,h)-k*h*(1.-h); }
+  float sdEll(vec3 p, vec3 r){ float k0=length(p/r); float k1=length(p/(r*r)); return k0*(k0-1.)/k1; }
+  float sdCap(vec3 p, vec3 a, vec3 b, float r){ vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+  // Tapered capsule: radius ra at a, rb at b
+  float sdCone(vec3 p, vec3 a, vec3 b, float ra, float rb){
+    vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);
+    return length(pa-ba*h)-mix(ra,rb,h);
+  }
+
+  float hash(vec3 p){ p=fract(p*.3183099+.1); p*=17.; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+  float noise(vec3 x){
+    vec3 i=floor(x), f=fract(x); f=f*f*(3.-2.*f);
+    return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x), mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x), mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y), f.z);
+  }
+  float fbm(vec3 p){ float a=.5, s=0.; for(int i=0;i<4;i++){ s+=a*noise(p); p=p*2.03+1.7; a*=.5; } return s; }
+  // Thin branching lines for surface vessels
+  float veins(vec3 p){
+    float v1 = 1.-abs(noise(p*2.2)*2.-1.);
+    float v2 = 1.-abs(noise(p*4.1+9.)*2.-1.);
+    return pow(v1, 26.) + .5*pow(v2, 30.);
+  }
+
+  // Ventricle frame: apex tilted toward the viewer's lower right
+  vec3 ventFrame(vec3 p){
+    vec3 q = p - vec3(.02,-.18,0.);
+    q.xy = rot(-.48)*q.xy;
+    q.yz = rot(.18)*q.yz;
+    return q;
+  }
+
+  // x: distance, y: material (0 muscle, 1 artery, 2 vein)
+  vec2 map(vec3 p){
+    float c = uVent;              // 0 relaxed .. 1 fully contracted
+    p.y -= .035*uEject;           // recoil as blood is thrown upward
+    // Ventricles: a tapered ellipsoid that squeezes, shortens toward the base and wrings
+    vec3 q = ventFrame(p);
+    q.y -= .07*c;                 // apex pulls up toward the base
+    q.xz = rot(c*.32*(q.y+.7))*q.xz;
+    float taper = mix(1., .5, smoothstep(.1,-.95,q.y));
+    vec3 r = vec3(.62,.86,.55)*vec3(1.-.13*c, 1.-.09*c, 1.-.13*c);
+    vec3 qt = q; qt.xz /= taper;
+    float vent = sdEll(qt, r)*taper;
+    // Right ventricle bulging forward
+    vec3 rv = q - vec3(-.16,.02,.2);
+    float rvd = sdEll(rv, vec3(.5,.62,.42)*(1.-.12*c));
+    float d = smin(vent, rvd, .12);
+
+    // Atria, which contract just before the ventricles
+    float a = 1.-.12*uAtria+.06*c;
+    float ra = sdEll(p-vec3(-.52,.38,.04), vec3(.36,.31,.33)*a);
+    float la = sdEll(p-vec3(.34,.44,-.26), vec3(.34,.27,.3)*a);
+    float aur = sdEll(p-vec3(.47,.42,.16), vec3(.2,.1,.13)*a);   // left auricle
+    float rau = sdEll(p-vec3(-.32,.52,.26), vec3(.18,.1,.12)*a); // right auricle
+    d = smin(d, ra, .14); d = smin(d, la, .14);
+    d = smin(d, aur, .06); d = smin(d, rau, .06);
+
+    // Surface relief: muscle grain + raised coronary vessels
+    if (d < .08) d -= .012*fbm(p*6.) + .006*veins(q*1.6+vec3(0,0,3.));
+    float mat = 0.;
+
+    // Great vessels swell slightly as blood is ejected
+    float s = 1.+.14*uEject;
+    float ao = sdCone(p, vec3(.02,.25,.05), vec3(.02,.98,.06), .21*s, .19*s);
+    ao = smin(ao, sdCap(p, vec3(.02,.98,.06), vec3(.18,1.16,.0), .185*s), .05);
+    ao = smin(ao, sdCap(p, vec3(.18,1.16,.0), vec3(.42,1.15,-.14), .175*s), .05);
+    ao = smin(ao, sdCap(p, vec3(.42,1.15,-.14), vec3(.56,.95,-.24), .165*s), .05);
+    ao = smin(ao, sdCone(p, vec3(.56,.95,-.24), vec3(.56,.15,-.36), .16*s, .14*s), .05);
+    // Arch branches
+    ao = smin(ao, sdCone(p, vec3(.12,1.12,.02), vec3(.04,1.52,.03), .075, .06), .05);
+    ao = smin(ao, sdCone(p, vec3(.28,1.2,-.06), vec3(.27,1.55,-.06), .065, .052), .05);
+    ao = smin(ao, sdCone(p, vec3(.42,1.16,-.13), vec3(.5,1.5,-.17), .065, .052), .05);
+    // Pulmonary trunk and its branches
+    float pu = sdCone(p, vec3(.2,.22,.32), vec3(.34,.74,.24), .2*s, .17*s);
+    pu = smin(pu, sdCone(p, vec3(.34,.74,.24), vec3(.8,.84,.06), .12, .09), .06);
+    pu = smin(pu, sdCone(p, vec3(.3,.76,.2), vec3(-.12,.88,-.08), .11, .085), .06);
+    float art = min(ao, pu);
+
+    // Venae cavae
+    float vc = sdCone(p, vec3(-.5,.42,0.), vec3(-.47,1.02,-.04), .15, .14);
+    vc = min(vc, sdCone(p, vec3(-.46,-.02,-.1), vec3(-.5,-.5,-.16), .15, .14));
+
+    if (art < d + .02) mat = 1.;
+    d = smin(d, art, .07);
+    if (vc < d) mat = 2.;
+    d = smin(d, vc, .06);
+    return vec2(d, mat);
+  }
+
+  vec3 normalAt(vec3 p){
+    const vec2 e = vec2(.0015, -.0015);
+    return normalize(e.xyy*map(p+e.xyy).x + e.yyx*map(p+e.yyx).x + e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
+  }
+  float occlusion(vec3 p, vec3 n){
+    float o = 0., w = 1.;
+    for (int i=1; i<=5; i++){ float h = .03*float(i); o += w*(h-map(p+n*h).x); w *= .7; }
+    return clamp(1.-2.2*o, 0., 1.);
+  }
+
+  vec3 surfaceColor(vec3 p, float mat){
+    vec3 q = ventFrame(p);
+    if (mat > 1.5) return vec3(.42,.2,.27);                    // vein: dusky purple
+    if (mat > .5) return mix(vec3(.78,.47,.43), vec3(.9,.64,.56), fbm(p*7.));  // artery wall
+    // Myocardium: deep red with fibres running toward the apex
+    float f = fbm(p*4.5);
+    float fib = .5+.5*sin(q.y*38.+q.x*12.+f*7.);
+    vec3 col = mix(vec3(.38,.035,.04), vec3(.66,.1,.08), f);
+    col *= .86+.14*fib;
+    // Epicardial fat along the grooves
+    float groove = exp(-pow((q.y-.42)*5.5, 2.)) + exp(-pow(q.x*7., 2.))*smoothstep(-.2,.3,q.z)*smoothstep(-.9,.3,q.y)*.8;
+    float fat = smoothstep(.6, .95, groove*(.55+.7*fbm(p*5.+3.)));
+    col = mix(col, vec3(.8,.6,.36), fat*.55);
+    // Coronary vessels
+    float v = veins(q*1.6+vec3(0,0,3.));
+    col = mix(col, vec3(.26,.03,.07), smoothstep(.2,.8,v)*.55);
+    return col;
+  }
+
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - .5*uRes) / uRes.y;
+    vec3 c0 = vec3(0., .26, 0.);
+    vec3 ro = vec3(0., .26, 5.0);
+    vec3 rd = normalize(vec3(uv*.82, -1.6));
+    // Orbit: rotate the camera around the heart
+    mat2 ry = rot(uRot.x), rx = rot(uRot.y);
+    ro -= c0; ro.yz = rx*ro.yz; ro.xz = ry*ro.xz; ro += c0;
+    rd.yz = rx*rd.yz; rd.xz = ry*rd.xz;
+
+    // Bounding sphere
+    vec3 oc = ro - c0; float b = dot(oc, rd), cc = dot(oc,oc) - 1.75*1.75, h = b*b - cc;
+    if (h < 0.) { outColor = vec4(0); return; }
+    float t = max(0., -b - sqrt(h)), tMax = -b + sqrt(h);
+
+    vec2 res; bool hit = false;
+    for (int i=0; i<110; i++){
+      res = map(ro + rd*t);
+      if (res.x < .0012*t) { hit = true; break; }
+      t += res.x*.85;
+      if (t > tMax) break;
+    }
+    if (!hit) { outColor = vec4(0); return; }
+
+    vec3 p = ro + rd*t, n = normalAt(p), v = -rd;
+    vec3 base = surfaceColor(p, res.y);
+    float occ = occlusion(p, n);
+
+    vec3 L1 = normalize(vec3(-.55,.75,.65));   // key, warm
+    vec3 L2 = normalize(vec3(.8,.15,-.55));    // rim
+    vec3 L3 = normalize(vec3(.3,-.6,.6));      // fill from below
+    float nl = dot(n, L1);
+    float dif = clamp(nl, 0., 1.);
+    float wrap = clamp((nl+.55)/1.55, 0., 1.);
+    float fill = clamp(dot(n, L3), 0., 1.);
+    float fres = pow(1.-clamp(dot(n, v), 0., 1.), 3.5);
+
+    vec3 col = base*(vec3(1.,.95,.9)*dif*1.05 + vec3(.32,.3,.34)*occ + vec3(.18,.12,.12)*fill);
+    // Fake subsurface scattering: light bleeding through thin tissue
+    col += base*vec3(1.,.28,.22)*(wrap-dif)*.9*occ;
+    // Wet, glossy surface
+    vec3 hv = normalize(L1+v);
+    float gloss = res.y > .5 ? 90. : 140.;
+    col += vec3(1.,.96,.94)*pow(clamp(dot(n,hv),0.,1.), gloss)*1.1*occ;
+    col += vec3(1.,.85,.8)*pow(clamp(dot(n,hv),0.,1.), 14.)*.12*occ;
+    col += vec3(1.,.55,.5)*pow(clamp(dot(n, normalize(L2+v)),0.,1.), 40.)*.5;
+    // Rim and studio reflection
+    col += vec3(1.,.82,.8)*fres*.32*(.5+.5*n.y);
+    col += vec3(1.,.4,.35)*clamp(dot(n,L2),0.,1.)*.22*fres;
+
+    col *= 1.+.18*uVent*(res.y < .5 ? 1. : .4);  // flush as the muscle tightens
+    float grey = dot(col, vec3(.3,.59,.11));
+    col = mix(vec3(grey)*vec3(1.,.93,.92), col, .82+.18*uLife);   // no pulse → paler, still
+    col = col/(1.+col*.18);                      // soft tone map
+    col = pow(col, vec3(.4545));
+    outColor = vec4(col, 1.);
+  }`;
+      function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog); gl.useProgram(prog);
+      const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const U = {}; for (const n of ["uRes", "uTime", "uVent", "uAtria", "uEject", "uLife", "uRot"]) U[n] = gl.getUniformLocation(prog, n);
+
+      // Same envelope as the site: atria, then ventricles (lub), then the "dub"; a beat every 0.85 s.
+      const PERIOD = 0.85;
+      function beat(t) {
+        const k = ((t % PERIOD) + PERIOD) % PERIOD;
+        const atria = Math.exp(-(((k - 0.03) / 0.05) ** 2));
+        let vent = 0;
+        if (k > 0.06) { const kv = k - 0.06; vent = kv < 0.1 ? Math.sin(kv / 0.1 * Math.PI / 2) : Math.exp(-(kv - 0.1) / 0.16); vent += 0.18 * Math.exp(-(((k - 0.4) / 0.04) ** 2)); }
+        const ke = k - 0.12;
+        const eject = ke > 0 ? (ke < 0.08 ? Math.sin(ke / 0.08 * Math.PI / 2) : Math.exp(-(ke - 0.08) / 0.14)) : 0;
+        return { atria, vent: Math.min(1.1, vent), eject };
+      }
+
+      const wc = document.getElementById("heart-wave").getContext("2d");
+      const wave = window.__heartbeatWave || [];
+      function drawWave(t, pulse) {
+        wc.clearRect(0, 0, 1920, 1080);
+        const mid = 640, amp = 140;
+        const g = wc.createRadialGradient(1330, 540, 0, 1330, 540, 620);
+        g.addColorStop(0, `rgba(255,75,43,${0.05 + 0.08 * pulse})`); g.addColorStop(1, "rgba(255,75,43,0)");
+        wc.fillStyle = g; wc.fillRect(0, 0, 1920, 1080);
+        wc.strokeStyle = "#e7e7ea"; wc.lineWidth = 2; wc.setLineDash([3, 10]);
+        wc.beginPath(); wc.moveTo(0, mid); wc.lineTo(1920, mid); wc.stroke(); wc.setLineDash([]);
+        if (!wave.length) return;
+        const head = 900 + Math.floor(t * 100), n = 800;     // 8 s across the frame
+        wc.beginPath();
+        for (let i = 0; i < n; i++) {
+          const v = Math.max(-1.3, Math.min(1.3, wave[(head - n + i) % wave.length]));
+          const x = i / (n - 1) * 1920, y = mid - v * amp;
+          i ? wc.lineTo(x, y) : wc.moveTo(x, y);
+        }
+        wc.strokeStyle = "#ff4b2b"; wc.lineWidth = 4.5; wc.lineJoin = "round"; wc.stroke();
+        const fl = wc.createLinearGradient(0, 0, 420, 0);
+        fl.addColorStop(0, "#ffffffff"); fl.addColorStop(1, "#ffffff00");
+        wc.fillStyle = fl; wc.fillRect(0, 0, 420, 1080);
+      }
+
+      function renderAt(time) {
+        const t = local(time);
+        const b = beat(t);
+        const intro = Math.min(1, t / 0.9);
+        gl.viewport(0, 0, 1000, 1000);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniform2f(U.uRes, 1000, 1000);
+        gl.uniform1f(U.uTime, t);
+        gl.uniform1f(U.uVent, b.vent); gl.uniform1f(U.uAtria, b.atria); gl.uniform1f(U.uEject, b.eject);
+        gl.uniform1f(U.uLife, 1);
+        gl.uniform2f(U.uRot, -0.25 + Math.sin(t * 0.5) * 0.25, -0.05);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        document.getElementById("heart-gl").style.transform = `translate(${-260 * (1 - (1 - Math.pow(1 - intro, 3)))}px, ${120 * (1 - (1 - Math.pow(1 - intro, 3)))}px) scale(${1.6 - 0.6 * (1 - Math.pow(1 - intro, 3))})`;
+        drawWave(t, b.vent);
+      }
+      window.addEventListener("hf-seek", e => renderAt(e.detail.time));
+      renderAt(0);
+    })();
+  </script>
+</template>

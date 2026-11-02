@@ -1,0 +1,43 @@
+<template>
+  <style>
+    @font-face { font-family: "Inter Tight"; font-weight: 400; src: url("assets/fonts/InterTight-400.woff2") format("woff2"); }
+    @font-face { font-family: "Inter Tight"; font-weight: 500; src: url("assets/fonts/InterTight-500.woff2") format("woff2"); }
+    #root { position: absolute; inset: 0; background: #ffffff; overflow: hidden; font-family: "Inter Tight", sans-serif; color: #1d1d1f; }
+    #end-mark { position: absolute; left: 0; right: 0; top: 330px; display: flex; justify-content: center; align-items: center; gap: 26px; }
+    #end-heart { display: block; width: 104px; height: 104px; }
+    #end-word { font-size: 132px; font-weight: 500; letter-spacing: -0.05em; line-height: 1; display: block; }
+    #end-cmd {
+      position: absolute; left: 50%; top: 560px; transform: translateX(-50%);
+      background: #f5f5f7; border-radius: 18px; padding: 22px 34px;
+      font-family: "JetBrains Mono", monospace; font-size: 30px; color: #1d1d1f; white-space: nowrap;
+    }
+    #end-cmd b { color: #ff4b2b; font-weight: 400; }
+    #end-url { position: absolute; left: 0; right: 0; top: 690px; text-align: center; font-size: 32px; color: #6e6e73; }
+    #end-fine { position: absolute; left: 0; right: 0; top: 760px; text-align: center; font-size: 28px; color: #8e8e93; }
+  </style>
+  <div data-hf-id="hf-gwd0" id="root" data-composition-id="endcard" data-width="1920" data-height="1080" data-duration="4.8">
+    <div data-hf-id="hf-trrt" id="end-mark" class="clip" data-start="0" data-duration="4.8" data-track-index="2">
+      <svg data-hf-id="hf-t94y" id="end-heart" viewBox="0 0 32 32" aria-hidden="true">
+        <path data-hf-id="hf-rdv9" id="end-heart-path" fill="#ff4b2b" d="M16 28.5 4.3 17.1C1.2 14.1 1.3 9 4.6 6.2c2.9-2.5 7.2-2 9.6.9L16 9.2l1.8-2.1c2.4-2.9 6.7-3.4 9.6-.9 3.3 2.8 3.4 7.9.3 10.9L16 28.5Z"/>
+      </svg>
+      <span data-hf-id="hf-xx3m" id="end-word">heartbeat</span>
+    </div>
+    <div data-hf-id="hf-eo2b" id="end-cmd" class="clip" data-start="0.9" data-duration="3.9" data-track-index="3">git clone github.com/rishabhknowss/macbook-heartbeat <b data-hf-id="hf-6g3x">&amp;&amp;</b> make run</div>
+    <p data-hf-id="hf-g9nh" id="end-url" class="clip" data-start="1.3" data-duration="3.5" data-track-index="3">macbook-heartbeat-rishabh.vercel.app</p>
+    <p data-hf-id="hf-6t55" id="end-fine" class="clip" data-start="1.5" data-duration="3.3" data-track-index="3">experimental · not a medical device</p>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // The heart is carried in with one beat, then the wordmark wipes out of it.
+      tl.fromTo("#end-heart", { scale: 0, rotation: -12 }, { scale: 1, rotation: 0, duration: 0.55, ease: "back.out(2.2)" }, 0.1);
+      tl.to("#end-heart", { scale: 1.14, duration: 0.09, ease: "power2.out", yoyo: true, repeat: 1 }, 0.75);
+      tl.to("#end-heart", { scale: 1.08, duration: 0.08, ease: "power2.out", yoyo: true, repeat: 1 }, 1.0);
+      tl.fromTo("#end-word", { clipPath: "inset(0 100% -10% 0)" }, { clipPath: "inset(0 0% -10% 0)", duration: 0.6, ease: "expo.out" }, 0.45);
+      tl.fromTo("#end-cmd", { clipPath: "inset(0 100% 0 0 round 18px)" }, { clipPath: "inset(0 0% 0 0 round 18px)", duration: 0.55, ease: "expo.out" }, 0.9);
+      tl.fromTo("#end-url", { clipPath: "inset(0 50% 0 50%)" }, { clipPath: "inset(0 0% 0 0%)", duration: 0.45, ease: "expo.out" }, 1.3);
+      tl.fromTo("#end-fine", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.5);
+      window.__timelines["endcard"] = tl;
+    })();
+  </script>
+</template>
