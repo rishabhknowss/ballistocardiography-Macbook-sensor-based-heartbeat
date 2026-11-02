@@ -39,6 +39,11 @@
   <script>
     (() => {
       const DUR = 5.6, START = 19.6;
+      // Match the capture's pixel density (2 for a 4K render).
+      const DPR = Math.max(1, Math.round(window.devicePixelRatio || 1));
+      const glCanvas = document.getElementById("heart-gl"), waveCanvas = document.getElementById("heart-wave");
+      glCanvas.width = glCanvas.height = 1000 * DPR;
+      waveCanvas.width = 1920 * DPR; waveCanvas.height = 1080 * DPR;
       // hf-seek carries the film's time; convert to this scene's clock.
       const local = t => (t >= DUR ? t - START : t);
 
@@ -252,6 +257,7 @@
       const wc = document.getElementById("heart-wave").getContext("2d");
       const wave = window.__heartbeatWave || [];
       function drawWave(t, pulse) {
+        wc.setTransform(DPR, 0, 0, DPR, 0, 0);
         wc.clearRect(0, 0, 1920, 1080);
         const mid = 640, amp = 140;
         const g = wc.createRadialGradient(1330, 540, 0, 1330, 540, 620);
@@ -277,9 +283,9 @@
         const t = local(time);
         const b = beat(t);
         const intro = Math.min(1, t / 0.9);
-        gl.viewport(0, 0, 1000, 1000);
+        gl.viewport(0, 0, 1000 * DPR, 1000 * DPR);
         gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.uniform2f(U.uRes, 1000, 1000);
+        gl.uniform2f(U.uRes, 1000 * DPR, 1000 * DPR);
         gl.uniform1f(U.uTime, t);
         gl.uniform1f(U.uVent, b.vent); gl.uniform1f(U.uAtria, b.atria); gl.uniform1f(U.uEject, b.eject);
         gl.uniform1f(U.uLife, 1);

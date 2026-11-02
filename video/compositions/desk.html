@@ -97,7 +97,9 @@
     const W = 1920, H = 1080;
     const canvas = document.getElementById("desk-gl");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(1);
+    // Draw at the capture's pixel density (2 for a 4K render) so the 3D stays sharp.
+    const DPR = Math.max(1, Math.round(window.devicePixelRatio || 1));
+    renderer.setPixelRatio(DPR);
     renderer.setSize(W, H, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -118,7 +120,7 @@
     const key = new THREE.DirectionalLight(0xfff3e8, 2.2);
     key.position.set(-4, 7, 4);
     key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.mapSize.set(2048 * DPR, 2048 * DPR);
     key.shadow.camera.left = -4; key.shadow.camera.right = 4;
     key.shadow.camera.top = 4; key.shadow.camera.bottom = -4;
     key.shadow.radius = 6; key.shadow.bias = -0.0004;
@@ -221,7 +223,8 @@
     hinge.add(bezel);
     const tex = new THREE.TextureLoader().load("assets/screen.jpg");
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
+    tex.anisotropy = 16;
+    tex.generateMipmaps = true;
     const SCREEN_ASPECT = 2.84 / 1.82, IMG_ASPECT = 1524 / 784;
     tex.repeat.set(SCREEN_ASPECT / IMG_ASPECT, 1);
     tex.offset.set((1 - SCREEN_ASPECT / IMG_ASPECT) / 2, 0);
@@ -234,7 +237,7 @@
       color: 0xc98a6c, roughness: 0.52, sheen: 0.6, sheenColor: new THREE.Color(0xff9c80),
       sheenRoughness: 0.45, clearcoat: 0.05, clearcoatRoughness: 0.6, transparent: true,
     });
-    const REST_Y = BASE_T + 0.07;
+    const REST_Y = BASE_T + 0.105;
     const handR = new THREE.Group(), handL = new THREE.Group();
     handR.position.set(0.8, REST_Y, 0.82); handR.rotation.y = 0.16;
     handL.position.set(-0.8, REST_Y, 0.82); handL.rotation.y = -0.16;
