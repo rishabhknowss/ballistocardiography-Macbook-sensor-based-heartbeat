@@ -181,7 +181,8 @@ func serve(_ c: NWConnection) {
             return
         }
         let type = [ "html": "text/html; charset=utf-8", "js": "text/javascript", "css": "text/css",
-                     "svg": "image/svg+xml", "png": "image/png" ][file.pathExtension] ?? "application/octet-stream"
+                     "svg": "image/svg+xml", "png": "image/png",
+                     "jpg": "image/jpeg", "mp4": "video/mp4" ][file.pathExtension] ?? "application/octet-stream"
         var out = "HTTP/1.1 200 OK\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".data(using: .utf8)!
         out.append(body)
         c.send(content: out, completion: .contentProcessed { _ in c.cancel() })

@@ -163,6 +163,55 @@
   .pill.brand:hover { background: var(--brand-hover); }
   .pill.light { background: var(--bg); color: var(--fg); box-shadow: var(--shadow-float); }
   .pill.light:hover { background: var(--panel-2); }
+  .pill .play {
+    width: 18px; height: 18px; border-radius: 50%; background: var(--fg); position: relative; flex: none;
+  }
+  .pill .play::after {
+    content: ""; position: absolute; left: 7px; top: 5px;
+    border-left: 6px solid #fff; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  }
+
+  /* ---------- video modal ---------- */
+  .modal {
+    position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 32px; background: #ffffffb8;
+    backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+    opacity: 0; visibility: hidden; transition: opacity .28s ease, visibility 0s linear .28s;
+  }
+  .modal.open { opacity: 1; visibility: visible; transition: opacity .28s ease; }
+  .sheet {
+    width: min(1120px, 100%); background: var(--bg); border-radius: 28px; overflow: hidden;
+    box-shadow: 0 40px 80px -24px #00000040, 0 2px 6px #0000000d, 0 0 0 1px #0000000a;
+    transform: translateY(14px) scale(.98); transition: transform .38s cubic-bezier(.2,.7,.2,1);
+  }
+  .modal.open .sheet { transform: none; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px 14px 24px; }
+  .sheet-head h2 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.03em; }
+  .sheet-head h2 span { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--fg-3); font-size: 22px; letter-spacing: -0.01em; }
+  .close {
+    width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer; flex: none;
+    background: var(--panel); color: var(--fg-2); font-size: 18px; line-height: 1;
+    display: grid; place-items: center; transition: background .15s, color .15s;
+  }
+  .close:hover { background: var(--line); color: var(--fg); }
+  .frame { margin: 0 12px; border-radius: 18px; overflow: hidden; background: var(--panel); aspect-ratio: 16 / 9; }
+  .frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .sheet-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 14px 24px 18px; font-size: 13px; color: var(--fg-3);
+  }
+  .sheet-foot a { color: var(--fg); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+  .sheet-foot a:hover { color: var(--brand); }
+  @media (max-width: 700px) {
+    .modal { padding: 12px; }
+    .sheet { border-radius: 22px; }
+    .sheet-head { padding: 14px 14px 10px 16px; }
+    .frame { margin: 0 8px; border-radius: 14px; }
+    .sheet-foot { padding: 12px 16px 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .modal, .sheet { transition: none; }
+  }
 
   .setup {
     display: none; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
@@ -268,7 +317,7 @@
       <button data-axis="2" aria-pressed="false">Z</button>
     </div>
     <button class="pill brand live-only" id="snap">Save snapshot</button>
-    <a class="pill light" href="https://github.com/rishabhknowss/macbook-heartbeat">How it works</a>
+    <button class="pill light" id="howBtn" type="button"><span class="play" aria-hidden="true"></span>How it works</button>
   </div>
 
   <p class="fine">Experimental ballistocardiography. Not a medical device, not a reliable heart-rate reading.
@@ -981,6 +1030,44 @@
     setStatus("warn", "helper not running");
     showSetup(true);
   };
+})();
+</script>
+<div class="modal" id="howModal" role="dialog" aria-modal="true" aria-labelledby="howTitle" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="howTitle">how it works <span>in 30 seconds</span></h2>
+      <button class="close" id="howClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="frame">
+      <video id="howVideo" src="demo.mp4" poster="demo-poster.jpg" controls playsinline preload="none"></video>
+    </div>
+    <div class="sheet-foot">
+      <span>Real sensor trace · experimental, not a medical device</span>
+      <a href="https://github.com/rishabhknowss/ballistocardiography-Macbook-sensor-based-heartbeat">Read the full write-up on GitHub →</a>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const modal = document.getElementById("howModal"), video = document.getElementById("howVideo");
+  const openBtn = document.getElementById("howBtn"), closeBtn = document.getElementById("howClose");
+  function open() {
+    modal.classList.add("open"); modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    video.currentTime = 0;
+    video.play().catch(() => {});
+    closeBtn.focus();
+  }
+  function close() {
+    modal.classList.remove("open"); modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    video.pause();
+    openBtn.focus();
+  }
+  openBtn.addEventListener("click", open);
+  closeBtn.addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+  addEventListener("keydown", e => { if (e.key === "Escape" && modal.classList.contains("open")) close(); });
 })();
 </script>
 </body>
