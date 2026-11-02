@@ -9,8 +9,6 @@ program that reads the sensor and a web page that draws what it sees.
 
 **Live page:** https://macbook-heartbeat-rishabh.vercel.app (it needs the helper running on your Mac, see below)
 
-<video src="https://github.com/rishabhknowss/ballistocardiography-Macbook-sensor-based-heartbeat/raw/main/docs/demo.mp4" controls width="100%"></video>
-
 [![macbook heartbeat, 30-second demo](docs/demo.gif)](docs/demo.mp4)
 
 <sub>30-second demo with sound: [1080p MP4](docs/demo.mp4) · [4K MP4](docs/demo-4k.mp4). Made with [HyperFrames](https://hyperframes.heygen.com), source in [`video/`](video). The voiceover and music are from HeyGen and the hand models are the MIT-licensed WebXR generic hands. The red trace is a real recording from the flat-table test below. The 3D heart is an illustration.</sub>
