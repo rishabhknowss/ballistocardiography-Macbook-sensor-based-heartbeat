@@ -229,7 +229,7 @@
     <canvas id="wave"></canvas>
     <div class="floor" id="floor"></div>
     <div class="heart-wrap"><canvas id="heart"></canvas></div>
-    <div class="tag"><span><b id="rate">— Hz</b></span><span>1–10 Hz band</span><span id="gain">±— µg</span><span id="sync">heart: stopped</span></div>
+    <div class="tag"><span><b id="rate">— Hz</b></span><span>1–10 Hz band</span><span id="gain">±— µg</span><span id="sync">heart: resting beat</span></div>
     <div class="hold" id="hold">✋ <span>Hold still</span> <em id="holdWhy">too much motion</em></div>
 
     <div class="cards">
@@ -272,7 +272,7 @@
   </div>
 
   <p class="fine">Experimental ballistocardiography. Not a medical device, not a reliable heart-rate reading.
-    The 3D heart is an illustration. It only beats when the sensor picks up a rhythm.</p>
+    The 3D heart is an illustration. It keeps a soft resting beat and switches to your rate when the sensor locks one.</p>
 </section>
 
 <script>
@@ -439,7 +439,12 @@
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function onBeat(tb) {
     if (motionMg() >= MOTION_WARN) return;
-    if (quality > 0.35 && !reduceMotion) { heartBeat(); syncedUntil = performance.now() + 2200; }
+    // Re-align the heart's phase to real detections
+    if (quality > 0.35 && !reduceMotion) {
+      const now = performance.now() / 1000;
+      if (now - lastBeat > 0.45 * beatPeriod) heartBeat();
+      syncedUntil = performance.now() + 2200;
+    }
     setTimeout(() => {
       const t = S.t, y = S.bp[axis];
       const i0 = lowerBound(t, tb - PRE), i1 = lowerBound(t, tb + POST);
@@ -644,7 +649,7 @@
 
     col *= 1.+.18*uVent*(res.y < .5 ? 1. : .4);  // flush as the muscle tightens
     float grey = dot(col, vec3(.3,.59,.11));
-    col = mix(vec3(grey)*vec3(1.,.93,.92), col, .55+.45*uLife);   // no pulse → paler, still
+    col = mix(vec3(grey)*vec3(1.,.93,.92), col, .82+.18*uLife);   // no pulse → paler, still
     col = col/(1.+col*.18);                      // soft tone map
     col = pow(col, vec3(.4545));
     outColor = vec4(col, 1.);
@@ -673,7 +678,7 @@
   }
 
   // Beat envelope: atria squeeze, then the ventricles (lub), then valves close (dub)
-  let lastBeat = -10;
+  let lastBeat = -10, beatPeriod = 1;
   function heartBeat() { lastBeat = performance.now() / 1000; }
   function beatShape(now) {
     const k = now - lastBeat;
@@ -701,10 +706,13 @@
   function drawHeart(nowMs) {
     if (!prog) return null;
     const now = nowMs / 1000;
-    // The heart only moves when the sensor has found a rhythm. Otherwise it stops.
-    const synced = nowMs < syncedUntil;
+    // Resting beat until the sensor locks a rate, then pump at that rate.
+    const locked = connected && bpm && quality > 0.45;
+    const synced = locked || nowMs < syncedUntil;
+    beatPeriod = locked ? 60 / Math.min(150, Math.max(40, bpm)) : 1;
+    if (!reduceMotion && now - lastBeat >= beatPeriod) heartBeat();
     life += ((synced ? 1 : 0) - life) * 0.04;
-    $("sync").textContent = synced ? "heart: beating on detected pulses" : "heart: stopped · no pulse detected";
+    $("sync").textContent = locked ? `heart: pumping at ~${Math.round(bpm)} bpm from the sensor` : "heart: resting beat · no pulse locked yet";
 
     const r = heartCanvas.getBoundingClientRect();
     const d = Math.min(devicePixelRatio || 1, 1.5);
@@ -715,7 +723,8 @@
     const sway = reduceMotion ? 0 : Math.sin(now * 0.35) * 0.32 * (0.35 + 0.65 * life);
     rotS.x += ((sway + mouse.x * 0.7) - rotS.x) * 0.06;
     rotS.y += ((-0.05 + mouse.y * 0.25) - rotS.y) * 0.06;
-    const b = beatShape(now);
+    const raw = beatShape(now), k = 0.45 + 0.55 * life;
+    const b = { vent: raw.vent * k, atria: raw.atria * k, eject: raw.eject * k };
     gl.uniform2f(U.uRes, w, h);
     gl.uniform1f(U.uTime, now);
     gl.uniform1f(U.uVent, b.vent);

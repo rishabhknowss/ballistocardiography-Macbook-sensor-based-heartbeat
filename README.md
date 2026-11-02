@@ -121,8 +121,9 @@ The 3D heart in the middle is drawn in a single fragment shader. It's a raymarch
 signed-distance field made of ellipsoids for the chambers and tapered capsules for the
 aorta, pulmonary trunk and venae cavae. Noise adds the muscle grain, coronary vessels
 and fat in the grooves, and fake subsurface scattering gives it the wet look. It's an
-illustration, not a scan. It doesn't fake a rhythm. It sits still and pale until the
-sensor detects a pulse, then pumps on each detected beat. The atria squeeze first, then
+illustration, not a scan. Until the sensor locks onto a rhythm it keeps a soft
+resting beat (clearly labelled as such). Once there's a heart-rate estimate, it pumps at
+that rate at full strength and re-aligns to each detected spike. The atria squeeze first, then
 the ventricles shorten and twist, and the aorta bulges as the pressure wave arrives.
 
 "Save snapshot" exports a 1600×900 PNG of the heart and the current waveform.
