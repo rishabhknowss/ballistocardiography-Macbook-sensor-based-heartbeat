@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>macbook heartbeat</title>
+<meta name="description" content="Reading the hidden accelerometer in Apple Silicon MacBooks to try to feel your heartbeat. Experimental.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  /* Tokens shared with seamless.lunarlabs.space */
+  :root {
+    --bg: #ffffff;
+    --fg: #1d1d1f;
+    --fg-2: #6e6e73;
+    --fg-3: #a1a1a6;
+    --panel: #f5f5f7;
+    --panel-2: #fafafa;
+    --line: #e7e7ea;
+    --brand: #ff4b2b;
+    --brand-hover: #e93e20;
+    --green: #17803f;
+    --green-bg: #e4f5ea;
+    --orange: #e8590c;
+    --orange-bg: #fff0e6;
+    --shadow-float: 0 8px 24px -8px #0000001f, 0 2px 4px #00000008;
+    --sans: "Inter Tight", "Helvetica Neue", sans-serif;
+    --serif: "Instrument Serif", Georgia, serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+  button { font: inherit; color: inherit; }
+
+  header {
+    position: fixed; inset: 0 0 auto 0; z-index: 40;
+    background: #ffffffb3;
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+  .bar {
+    max-width: 1200px; height: 68px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .wordmark { font-size: 22px; font-weight: 500; letter-spacing: -0.04em; display: flex; align-items: center; gap: 8px; }
+  .wordmark i { font-style: normal; color: var(--brand); font-size: 18px; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 999px; padding: 5px 12px; font-size: 13px; line-height: 1.3;
+    background: var(--panel); color: var(--fg);
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-3); }
+  .chip.live { background: var(--green-bg); color: var(--green); }
+  .chip.live .dot { background: var(--green); animation: blink 1.6s ease-in-out infinite; }
+  .chip.warn { background: var(--orange-bg); color: var(--orange); }
+  .chip.warn .dot { background: var(--orange); }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  /* ---------- hero ---------- */
+  .hero {
+    min-height: 100svh; display: flex; flex-direction: column; align-items: center;
+    padding: 104px 0 28px; position: relative;
+  }
+  .title { text-align: center; padding: 0 24px; position: relative; z-index: 3; }
+  h1 {
+    margin: 0; font-weight: 400;
+    font-size: clamp(34px, 7vw, 72px); line-height: 1; letter-spacing: -0.05em;
+  }
+  h1 .serif {
+    font-family: var(--serif); font-style: italic; letter-spacing: -0.02em;
+    font-size: 1.04em; color: var(--fg-3);
+  }
+  .lede { max-width: 520px; margin: 18px auto 0; font-size: 16px; line-height: 1.6; color: var(--fg-2); }
+
+  .stage {
+    position: relative; width: 100%; flex: 1;
+    min-height: 420px; height: clamp(420px, 60vh, 680px);
+    margin-top: 20px;
+  }
+  canvas#wave { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+  .heart-wrap {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    height: 100%; aspect-ratio: 1; z-index: 2; pointer-events: none;
+  }
+  canvas#heart { width: 100%; height: 100%; display: block; }
+  .floor {
+    position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%);
+    width: 46%; height: 9%; border-radius: 50%; z-index: 1;
+    background: radial-gradient(closest-side, #5a0d0d33, #5a0d0d10 60%, transparent);
+    filter: blur(6px); transition: transform .15s ease;
+  }
+
+  .cards {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    max-width: 1200px; margin: 0 auto;
+  }
+  .card {
+    position: absolute; pointer-events: auto;
+    background: #ffffffd9; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border-radius: 22px; box-shadow: var(--shadow-float), 0 0 0 1px #00000008;
+    padding: 14px 16px 16px; width: 220px;
+  }
+  .card h3 {
+    margin: 0 0 8px; font-size: 12px; font-weight: 400; color: var(--fg-2);
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .card h3 span { color: var(--fg-3); }
+  .c-bpm    { left: 24px;  top: 10%; }
+  .c-signal { left: 56px;  top: 56%; }
+  .c-avg    { right: 24px; top: 10%; width: 240px; }
+  .c-motion { right: 56px; top: 56%; }
+
+  .bpm-num { font-size: 52px; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .bpm-num.dim { color: #d2d2d7; }
+  .bpm-num small { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--fg-3); margin-left: 4px; letter-spacing: 0; }
+  .note { font-size: 12px; color: var(--fg-3); margin-top: 6px; }
+  .big { font-size: 28px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .big small { font-size: 13px; color: var(--fg-3); letter-spacing: 0; margin-left: 3px; }
+  .meter { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 10px; }
+  .meter i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--fg); transition: width .2s ease, background .2s; }
+  canvas#avg { width: 100%; height: 70px; display: block; }
+
+  .hold {
+    position: absolute; left: 50%; bottom: 9%; transform: translate(-50%, 8px);
+    z-index: 4; background: var(--bg); box-shadow: var(--shadow-float); border-radius: 999px;
+    padding: 10px 18px; font-size: 14px; display: flex; align-items: center; gap: 10px;
+    opacity: 0; transition: opacity .25s ease, transform .25s ease; pointer-events: none; white-space: nowrap;
+  }
+  .hold.show { opacity: 1; transform: translate(-50%, 0); }
+  .hold em { font-family: var(--serif); font-size: 17px; color: var(--fg-2); }
+
+  .tag {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 3;
+    font-size: 12px; color: var(--fg-3); display: flex; gap: 12px; white-space: nowrap;
+  }
+  .tag b { font-weight: 400; color: var(--fg-2); }
+
+  /* ---------- dock ---------- */
+  .dock { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 8px 24px 0; position: relative; z-index: 3; }
+  .seg { display: inline-flex; background: var(--panel); border-radius: 999px; padding: 3px; }
+  .seg button {
+    border: 0; background: transparent; border-radius: 999px;
+    padding: 7px 13px; font-size: 13px; cursor: pointer; color: var(--fg-2);
+    transition: background .15s, color .15s;
+  }
+  .seg button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: var(--shadow-float); }
+  .pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 42px; padding: 10px 22px; border-radius: 999px; border: 0; cursor: pointer;
+    font-size: 14px; transition: background .15s; text-decoration: none;
+  }
+  .pill.brand { background: var(--brand); color: #fff; box-shadow: 0 6px 16px -6px #ff4b2b99, inset 0 1px 0 #ffffff40; }
+  .pill.brand:hover { background: var(--brand-hover); }
+  .pill.light { background: var(--bg); color: var(--fg); box-shadow: var(--shadow-float); }
+  .pill.light:hover { background: var(--panel-2); }
+
+  .setup {
+    display: none; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+    background: var(--panel); border-radius: 999px; padding: 6px 6px 6px 18px;
+  }
+  .setup.show { display: flex; }
+  .setup span { font-size: 13px; color: var(--fg-2); }
+  .setup code { font: 13px var(--mono); color: var(--fg); }
+  .setup button { min-height: 34px; padding: 6px 14px; font-size: 13px; }
+  .live-only.hide { display: none; }
+
+  .fine { margin: 18px 0 0; padding: 0 24px; font-size: 12px; line-height: 1.6; color: var(--fg-3); text-align: center; position: relative; z-index: 3; }
+  .fine a { color: var(--fg-2); }
+
+  @media (max-width: 960px) {
+    .c-signal, .c-motion { top: auto; bottom: 4%; }
+    .c-bpm, .c-signal { left: 16px; }
+    .c-avg, .c-motion { right: 16px; }
+    .card { width: 190px; }
+    .c-avg { width: 200px; }
+  }
+  @media (max-width: 700px) {
+    .bar { padding: 0 16px; }
+    .hero { padding-top: 92px; }
+    .lede { font-size: 15px; }
+    .stage { height: 380px; min-height: 380px; flex: none; }
+    .cards {
+      position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      padding: 0 16px; margin-top: 8px; width: 100%;
+    }
+    .card { position: static; width: auto !important; padding: 12px 14px 14px; border-radius: 18px; }
+    .c-avg { grid-column: 1 / -1; order: 3; }
+    .bpm-num { font-size: 40px; }
+    .big { font-size: 24px; }
+    .dock { margin-top: 14px; padding: 0 16px; }
+    .setup { border-radius: 20px; padding: 12px; }
+    .fine { padding: 0 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip.live .dot { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="wordmark"><i>♥</i>heartbeat</div>
+    <span class="chip" id="status"><span class="dot"></span><span id="statusText">connecting</span></span>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="title">
+    <h1>my macbook can feel <span class="serif">my heartbeat</span></h1>
+    <p class="lede">
+      There's an accelerometer hidden inside every Apple Silicon MacBook. Rest your
+      wrists on the palm rest, go still, and see if it catches your pulse.
+      Sometimes it does. Often it doesn't.
+    </p>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="wave"></canvas>
+    <div class="floor" id="floor"></div>
+    <div class="heart-wrap"><canvas id="heart"></canvas></div>
+    <div class="tag"><span><b id="rate">— Hz</b></span><span>1–10 Hz band</span><span id="gain">±— µg</span><span id="sync">heart: stopped</span></div>
+    <div class="hold" id="hold">✋ <span>Hold still</span> <em id="holdWhy">too much motion</em></div>
+
+    <div class="cards">
+      <div class="card c-bpm">
+        <h3>Heart rate <span>rough</span></h3>
+        <div class="bpm-num dim" id="bpm">—<small>bpm</small></div>
+        <div class="note" id="bpmNote">listening…</div>
+      </div>
+      <div class="card c-signal">
+        <h3>Signal <span id="qualityWord">—</span></h3>
+        <div class="big" id="quality">—<small>%</small></div>
+        <div class="meter"><i id="qualityBar"></i></div>
+      </div>
+      <div class="card c-avg">
+        <h3>Averaged beat <span id="avgCount">0 beats</span></h3>
+        <canvas id="avg"></canvas>
+      </div>
+      <div class="card c-motion">
+        <h3>Motion <span id="motionWord">—</span></h3>
+        <div class="big" id="motion">—<small>mg</small></div>
+        <div class="meter"><i id="motionBar"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dock">
+    <div class="setup" id="setup">
+      <span>Run the sensor helper on your Mac:</span>
+      <code>git clone github.com/rishabhknowss/macbook-heartbeat && make run</code>
+      <button class="pill light" id="copy">Copy</button>
+    </div>
+    <div class="seg live-only" role="group" aria-label="Axis">
+      <button data-axis="auto" aria-pressed="true">Auto</button>
+      <button data-axis="0" aria-pressed="false">X</button>
+      <button data-axis="1" aria-pressed="false">Y</button>
+      <button data-axis="2" aria-pressed="false">Z</button>
+    </div>
+    <button class="pill brand live-only" id="snap">Save snapshot</button>
+    <a class="pill light" href="https://github.com/rishabhknowss/macbook-heartbeat">How it works</a>
+  </div>
+
+  <p class="fine">Experimental ballistocardiography. Not a medical device, not a reliable heart-rate reading.
+    The 3D heart is an illustration. It only beats when the sensor picks up a rhythm.</p>
+</section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  // =====================================================================
+  // DSP
+  // =====================================================================
+  class Biquad {
+    constructor(type, f, fs, Q = Math.SQRT1_2) {
+      const w = 2 * Math.PI * f / fs, c = Math.cos(w), a = Math.sin(w) / (2 * Q), a0 = 1 + a;
+      const b0 = type === "lp" ? (1 - c) / 2 : (1 + c) / 2;
+      const b1 = type === "lp" ? 1 - c : -(1 + c);
+      this.b0 = b0 / a0; this.b1 = b1 / a0; this.b2 = b0 / a0;
+      this.a1 = -2 * c / a0; this.a2 = (1 - a) / a0;
+      this.x1 = this.x2 = this.y1 = this.y2 = 0;
+    }
+    step(x) {
+      const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
+      this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y;
+      return y;
+    }
+  }
+  const chain = (fs, specs) => {
+    const fs_ = specs.map(([t, f]) => new Biquad(t, f, fs));
+    return x => fs_.reduce((v, f) => f.step(v), x);
+  };
+
+  const WINDOW = 8;           // seconds visible
+  const KEEP = 12;            // seconds kept for analysis
+  const MOTION_WARN = 2.0;    // mg RMS — above this the trace is mostly you moving
+
+  let fs = 200, fsMeasured = null;
+  let axisMode = "auto", axis = 2;
+  let baseline = null, warm = 0;
+  let filters = null;
+
+  const S = { t: [], bp: [[], [], []], env: [[], [], []] };
+  let motionMs = 0;
+  const beats = [];
+  let bpm = null, quality = 0;
+
+  function buildFilters() {
+    filters = [0, 1, 2].map(() => ({
+      band: chain(fs, [["hp", 1.0], ["hp", 1.0], ["lp", 10], ["lp", 10]]),
+      env: chain(fs, [["lp", 3]]),
+      motion: chain(fs, [["hp", 0.5], ["lp", 40]]),
+    }));
+  }
+  buildFilters();
+
+  let rateWin = [];
+  function ingest(rows) {
+    for (const [t, x, y, z] of rows) {
+      rateWin.push(t);
+      if (rateWin.length > 400) rateWin.shift();
+      if (!baseline) baseline = [x, y, z];
+      const raw = [x - baseline[0], y - baseline[1], z - baseline[2]];
+      let m2 = 0;
+      S.t.push(t);
+      for (let i = 0; i < 3; i++) {
+        const f = filters[i];
+        const b = f.band(raw[i]);
+        S.bp[i].push(b);
+        S.env[i].push(Math.max(0, f.env(b * b)));
+        const m = f.motion(raw[i]); m2 += m * m;
+      }
+      const a = Math.exp(-1 / (fs * 0.4));
+      motionMs = a * motionMs + (1 - a) * m2;
+      warm++;
+    }
+    const cut = S.t.length - Math.round(KEEP * fs);
+    if (cut > fs) {
+      S.t.splice(0, cut);
+      for (let i = 0; i < 3; i++) { S.bp[i].splice(0, cut); S.env[i].splice(0, cut); }
+    }
+    if (rateWin.length > 300) {
+      const r = (rateWin.length - 1) / (rateWin[rateWin.length - 1] - rateWin[0]);
+      fsMeasured = r;
+      if (Math.abs(r - fs) / fs > 0.12) { fs = r; buildFilters(); warm = 0; }
+    }
+  }
+
+  // Autocorrelation of an envelope over the last 8 s, decimated to ~50 Hz.
+  function periodicity(env) {
+    const n = Math.min(env.length, Math.round(8 * fs));
+    if (n < fs * 4) return { score: 0, period: null };
+    const step = Math.max(1, Math.round(fs / 50)), r = fs / step;
+    const v = [];
+    for (let i = env.length - n; i < env.length; i += step) v.push(Math.sqrt(env[i]));
+    const mean = v.reduce((a, b) => a + b, 0) / v.length;
+    for (let i = 0; i < v.length; i++) v[i] -= mean;
+    let e0 = 0; for (const a of v) e0 += a * a;
+    if (e0 <= 0) return { score: 0, period: null };
+    const lo = Math.round(0.4 * r), hi = Math.round(1.5 * r);
+    let best = -1, lag = null;
+    const ac = [];
+    for (let L = lo; L <= hi; L++) {
+      let s = 0; for (let i = L; i < v.length; i++) s += v[i] * v[i - L];
+      ac[L] = s / e0 * v.length / (v.length - L);
+    }
+    for (let L = lo + 1; L < hi; L++) {
+      if (ac[L] > ac[L - 1] && ac[L] >= ac[L + 1] && ac[L] > best) { best = ac[L]; lag = L; }
+    }
+    if (lag && lag / 2 >= lo) {
+      const h = Math.round(lag / 2);
+      const hv = Math.max(ac[h - 1] ?? -1, ac[h] ?? -1, ac[h + 1] ?? -1);
+      if (hv > 0.8 * best) { best = hv; lag = h; }
+    }
+    return { score: Math.max(0, best), period: lag ? lag / r : null };
+  }
+
+  let lastAnalysis = 0, axisScores = [0, 0, 0];
+  function analyze() {
+    const now = S.t[S.t.length - 1];
+    if (now == null || now - lastAnalysis < 0.5) return;
+    lastAnalysis = now;
+    const res = [0, 1, 2].map(i => periodicity(S.env[i]));
+    axisScores = axisScores.map((s, i) => 0.6 * s + 0.4 * res[i].score);
+    if (axisMode === "auto") {
+      const top = axisScores.indexOf(Math.max(...axisScores));
+      if (axisScores[top] > axisScores[axis] + 0.08) axis = top;
+    }
+    const r = res[axis];
+    const still = motionMg() < MOTION_WARN;
+    quality = still && warm > fs * 3 ? Math.min(1, r.score / 0.6) : 0;
+    if (quality > 0.45 && r.period) {
+      const est = 60 / r.period;
+      bpm = bpm == null ? est : bpm + 0.35 * (est - bpm);
+    } else if (quality < 0.2) {
+      bpm = null;
+    }
+    detectBeats(r.period);
+  }
+
+  function detectBeats(period) {
+    const env = S.env[axis], t = S.t, n = env.length;
+    if (n < fs * 3) return;
+    const span = Math.round(3 * fs);
+    const seg = env.slice(n - span).sort((a, b) => a - b);
+    const thr = seg[Math.floor(seg.length * 0.75)] * 1.6;
+    const gap = Math.max(0.33, 0.6 * (period || 0.9));
+    const half = Math.round(0.12 * fs);
+    const last = beats.length ? beats[beats.length - 1] : -1;
+    for (let i = n - span; i < n - half; i++) {
+      if (t[i] <= last + gap || env[i] < thr) continue;
+      let peak = true;
+      for (let k = i - half; k <= i + half; k++) if (env[k] > env[i]) { peak = false; break; }
+      if (peak) {
+        const prev = beats.length ? beats[beats.length - 1] : -1;
+        if (t[i] > prev + gap) { beats.push(t[i]); onBeat(t[i]); }
+      }
+    }
+    while (beats.length && beats[0] < t[0]) beats.shift();
+  }
+
+  const motionMg = () => Math.sqrt(motionMs) * 1000;
+
+  // Ensemble average around each detected beat
+  const PRE = 0.25, POST = 0.6, AVG_N = 20;
+  const ensemble = [];
+  let syncedUntil = 0;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function onBeat(tb) {
+    if (motionMg() >= MOTION_WARN) return;
+    if (quality > 0.35 && !reduceMotion) { heartBeat(); syncedUntil = performance.now() + 2200; }
+    setTimeout(() => {
+      const t = S.t, y = S.bp[axis];
+      const i0 = lowerBound(t, tb - PRE), i1 = lowerBound(t, tb + POST);
+      if (i0 <= 0 || i1 >= t.length) return;
+      const L = 120, seg = new Float32Array(L);
+      for (let k = 0; k < L; k++) seg[k] = interp(t, y, tb - PRE + (PRE + POST) * k / (L - 1));
+      ensemble.push(seg);
+      if (ensemble.length > AVG_N) ensemble.shift();
+    }, (POST + 0.15) * 1000);
+  }
+  function lowerBound(a, x) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; a[m] < x ? lo = m + 1 : hi = m; } return lo; }
+  function interp(t, y, x) {
+    const i = Math.min(Math.max(1, lowerBound(t, x)), t.length - 1);
+    const f = (x - t[i - 1]) / ((t[i] - t[i - 1]) || 1);
+    return y[i - 1] + f * (y[i] - y[i - 1]);
+  }
+
+  // =====================================================================
+  // 3D heart — raymarched signed-distance field
+  // =====================================================================
+  const heartCanvas = $("heart");
+  const gl = heartCanvas.getContext("webgl2", { premultipliedAlpha: true, alpha: true, antialias: false, preserveDrawingBuffer: true });
+
+  const VS = `#version 300 es
+  in vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
+
+  const FS = `#version 300 es
+  precision highp float;
+  uniform vec2 uRes;
+  uniform float uTime, uVent, uAtria, uEject, uLife;
+  uniform vec2 uRot;
+  out vec4 outColor;
+
+  mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+  float smin(float a, float b, float k){ float h=clamp(.5+.5*(b-a)/k,0.,1.); return mix(b,a,h)-k*h*(1.-h); }
+  float sdEll(vec3 p, vec3 r){ float k0=length(p/r); float k1=length(p/(r*r)); return k0*(k0-1.)/k1; }
+  float sdCap(vec3 p, vec3 a, vec3 b, float r){ vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+  // Tapered capsule: radius ra at a, rb at b
+  float sdCone(vec3 p, vec3 a, vec3 b, float ra, float rb){
+    vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);
+    return length(pa-ba*h)-mix(ra,rb,h);
+  }
+
+  float hash(vec3 p){ p=fract(p*.3183099+.1); p*=17.; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+  float noise(vec3 x){
+    vec3 i=floor(x), f=fract(x); f=f*f*(3.-2.*f);
+    return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x), mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x), mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y), f.z);
+  }
+  float fbm(vec3 p){ float a=.5, s=0.; for(int i=0;i<4;i++){ s+=a*noise(p); p=p*2.03+1.7; a*=.5; } return s; }
+  // Thin branching lines for surface vessels
+  float veins(vec3 p){
+    float v1 = 1.-abs(noise(p*2.2)*2.-1.);
+    float v2 = 1.-abs(noise(p*4.1+9.)*2.-1.);
+    return pow(v1, 26.) + .5*pow(v2, 30.);
+  }
+
+  // Ventricle frame: apex tilted toward the viewer's lower right
+  vec3 ventFrame(vec3 p){
+    vec3 q = p - vec3(.02,-.18,0.);
+    q.xy = rot(-.48)*q.xy;
+    q.yz = rot(.18)*q.yz;
+    return q;
+  }
+
+  // x: distance, y: material (0 muscle, 1 artery, 2 vein)
+  vec2 map(vec3 p){
+    float c = uVent;              // 0 relaxed .. 1 fully contracted
+    p.y -= .035*uEject;           // recoil as blood is thrown upward
+    // Ventricles: a tapered ellipsoid that squeezes, shortens toward the base and wrings
+    vec3 q = ventFrame(p);
+    q.y -= .07*c;                 // apex pulls up toward the base
+    q.xz = rot(c*.32*(q.y+.7))*q.xz;
+    float taper = mix(1., .5, smoothstep(.1,-.95,q.y));
+    vec3 r = vec3(.62,.86,.55)*vec3(1.-.13*c, 1.-.09*c, 1.-.13*c);
+    vec3 qt = q; qt.xz /= taper;
+    float vent = sdEll(qt, r)*taper;
+    // Right ventricle bulging forward
+    vec3 rv = q - vec3(-.16,.02,.2);
+    float rvd = sdEll(rv, vec3(.5,.62,.42)*(1.-.12*c));
+    float d = smin(vent, rvd, .12);
+
+    // Atria, which contract just before the ventricles
+    float a = 1.-.12*uAtria+.06*c;
+    float ra = sdEll(p-vec3(-.52,.38,.04), vec3(.36,.31,.33)*a);
+    float la = sdEll(p-vec3(.34,.44,-.26), vec3(.34,.27,.3)*a);
+    float aur = sdEll(p-vec3(.47,.42,.16), vec3(.2,.1,.13)*a);   // left auricle
+    float rau = sdEll(p-vec3(-.32,.52,.26), vec3(.18,.1,.12)*a); // right auricle
+    d = smin(d, ra, .14); d = smin(d, la, .14);
+    d = smin(d, aur, .06); d = smin(d, rau, .06);
+
+    // Surface relief: muscle grain + raised coronary vessels
+    if (d < .08) d -= .012*fbm(p*6.) + .006*veins(q*1.6+vec3(0,0,3.));
+    float mat = 0.;
+
+    // Great vessels swell slightly as blood is ejected
+    float s = 1.+.14*uEject;
+    float ao = sdCone(p, vec3(.02,.25,.05), vec3(.02,.98,.06), .21*s, .19*s);
+    ao = smin(ao, sdCap(p, vec3(.02,.98,.06), vec3(.18,1.16,.0), .185*s), .05);
+    ao = smin(ao, sdCap(p, vec3(.18,1.16,.0), vec3(.42,1.15,-.14), .175*s), .05);
+    ao = smin(ao, sdCap(p, vec3(.42,1.15,-.14), vec3(.56,.95,-.24), .165*s), .05);
+    ao = smin(ao, sdCone(p, vec3(.56,.95,-.24), vec3(.56,.15,-.36), .16*s, .14*s), .05);
+    // Arch branches
+    ao = smin(ao, sdCone(p, vec3(.12,1.12,.02), vec3(.04,1.52,.03), .075, .06), .05);
+    ao = smin(ao, sdCone(p, vec3(.28,1.2,-.06), vec3(.27,1.55,-.06), .065, .052), .05);
+    ao = smin(ao, sdCone(p, vec3(.42,1.16,-.13), vec3(.5,1.5,-.17), .065, .052), .05);
+    // Pulmonary trunk and its branches
+    float pu = sdCone(p, vec3(.2,.22,.32), vec3(.34,.74,.24), .2*s, .17*s);
+    pu = smin(pu, sdCone(p, vec3(.34,.74,.24), vec3(.8,.84,.06), .12, .09), .06);
+    pu = smin(pu, sdCone(p, vec3(.3,.76,.2), vec3(-.12,.88,-.08), .11, .085), .06);
+    float art = min(ao, pu);
+
+    // Venae cavae
+    float vc = sdCone(p, vec3(-.5,.42,0.), vec3(-.47,1.02,-.04), .15, .14);
+    vc = min(vc, sdCone(p, vec3(-.46,-.02,-.1), vec3(-.5,-.5,-.16), .15, .14));
+
+    if (art < d + .02) mat = 1.;
+    d = smin(d, art, .07);
+    if (vc < d) mat = 2.;
+    d = smin(d, vc, .06);
+    return vec2(d, mat);
+  }
+
+  vec3 normalAt(vec3 p){
+    const vec2 e = vec2(.0015, -.0015);
+    return normalize(e.xyy*map(p+e.xyy).x + e.yyx*map(p+e.yyx).x + e.yxy*map(p+e.yxy).x + e.xxx*map(p+e.xxx).x);
+  }
+  float occlusion(vec3 p, vec3 n){
+    float o = 0., w = 1.;
+    for (int i=1; i<=5; i++){ float h = .03*float(i); o += w*(h-map(p+n*h).x); w *= .7; }
+    return clamp(1.-2.2*o, 0., 1.);
+  }
+
+  vec3 surfaceColor(vec3 p, float mat){
+    vec3 q = ventFrame(p);
+    if (mat > 1.5) return vec3(.42,.2,.27);                    // vein: dusky purple
+    if (mat > .5) return mix(vec3(.78,.47,.43), vec3(.9,.64,.56), fbm(p*7.));  // artery wall
+    // Myocardium: deep red with fibres running toward the apex
+    float f = fbm(p*4.5);
+    float fib = .5+.5*sin(q.y*38.+q.x*12.+f*7.);
+    vec3 col = mix(vec3(.38,.035,.04), vec3(.66,.1,.08), f);
+    col *= .86+.14*fib;
+    // Epicardial fat along the grooves
+    float groove = exp(-pow((q.y-.42)*5.5, 2.)) + exp(-pow(q.x*7., 2.))*smoothstep(-.2,.3,q.z)*smoothstep(-.9,.3,q.y)*.8;
+    float fat = smoothstep(.6, .95, groove*(.55+.7*fbm(p*5.+3.)));
+    col = mix(col, vec3(.8,.6,.36), fat*.55);
+    // Coronary vessels
+    float v = veins(q*1.6+vec3(0,0,3.));
+    col = mix(col, vec3(.26,.03,.07), smoothstep(.2,.8,v)*.55);
+    return col;
+  }
+
+  void main(){
+    vec2 uv = (gl_FragCoord.xy - .5*uRes) / uRes.y;
+    vec3 c0 = vec3(0., .26, 0.);
+    vec3 ro = vec3(0., .26, 5.0);
+    vec3 rd = normalize(vec3(uv*.82, -1.6));
+    // Orbit: rotate the camera around the heart
+    mat2 ry = rot(uRot.x), rx = rot(uRot.y);
+    ro -= c0; ro.yz = rx*ro.yz; ro.xz = ry*ro.xz; ro += c0;
+    rd.yz = rx*rd.yz; rd.xz = ry*rd.xz;
+
+    // Bounding sphere
+    vec3 oc = ro - c0; float b = dot(oc, rd), cc = dot(oc,oc) - 1.75*1.75, h = b*b - cc;
+    if (h < 0.) { outColor = vec4(0); return; }
+    float t = max(0., -b - sqrt(h)), tMax = -b + sqrt(h);
+
+    vec2 res; bool hit = false;
+    for (int i=0; i<110; i++){
+      res = map(ro + rd*t);
+      if (res.x < .0012*t) { hit = true; break; }
+      t += res.x*.85;
+      if (t > tMax) break;
+    }
+    if (!hit) { outColor = vec4(0); return; }
+
+    vec3 p = ro + rd*t, n = normalAt(p), v = -rd;
+    vec3 base = surfaceColor(p, res.y);
+    float occ = occlusion(p, n);
+
+    vec3 L1 = normalize(vec3(-.55,.75,.65));   // key, warm
+    vec3 L2 = normalize(vec3(.8,.15,-.55));    // rim
+    vec3 L3 = normalize(vec3(.3,-.6,.6));      // fill from below
+    float nl = dot(n, L1);
+    float dif = clamp(nl, 0., 1.);
+    float wrap = clamp((nl+.55)/1.55, 0., 1.);
+    float fill = clamp(dot(n, L3), 0., 1.);
+    float fres = pow(1.-clamp(dot(n, v), 0., 1.), 3.5);
+
+    vec3 col = base*(vec3(1.,.95,.9)*dif*1.05 + vec3(.32,.3,.34)*occ + vec3(.18,.12,.12)*fill);
+    // Fake subsurface scattering: light bleeding through thin tissue
+    col += base*vec3(1.,.28,.22)*(wrap-dif)*.9*occ;
+    // Wet, glossy surface
+    vec3 hv = normalize(L1+v);
+    float gloss = res.y > .5 ? 90. : 140.;
+    col += vec3(1.,.96,.94)*pow(clamp(dot(n,hv),0.,1.), gloss)*1.1*occ;
+    col += vec3(1.,.85,.8)*pow(clamp(dot(n,hv),0.,1.), 14.)*.12*occ;
+    col += vec3(1.,.55,.5)*pow(clamp(dot(n, normalize(L2+v)),0.,1.), 40.)*.5;
+    // Rim and studio reflection
+    col += vec3(1.,.82,.8)*fres*.32*(.5+.5*n.y);
+    col += vec3(1.,.4,.35)*clamp(dot(n,L2),0.,1.)*.22*fres;
+
+    col *= 1.+.18*uVent*(res.y < .5 ? 1. : .4);  // flush as the muscle tightens
+    float grey = dot(col, vec3(.3,.59,.11));
+    col = mix(vec3(grey)*vec3(1.,.93,.92), col, .55+.45*uLife);   // no pulse → paler, still
+    col = col/(1.+col*.18);                      // soft tone map
+    col = pow(col, vec3(.4545));
+    outColor = vec4(col, 1.);
+  }`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  let prog = null, U = {};
+  if (gl) {
+    try {
+      prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+      gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      gl.useProgram(prog);
+      const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "p");
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      for (const n of ["uRes", "uTime", "uVent", "uAtria", "uEject", "uLife", "uRot"]) U[n] = gl.getUniformLocation(prog, n);
+    } catch (e) { console.error("[heartbeat] shader", e); prog = null; }
+  }
+
+  // Beat envelope: atria squeeze, then the ventricles (lub), then valves close (dub)
+  let lastBeat = -10;
+  function heartBeat() { lastBeat = performance.now() / 1000; }
+  function beatShape(now) {
+    const k = now - lastBeat;
+    const atria = Math.exp(-(((k - 0.03) / 0.05) ** 2));
+    let vent = 0;
+    if (k > 0.06) {
+      const kv = k - 0.06;
+      vent = kv < 0.1 ? Math.sin(kv / 0.1 * Math.PI / 2) : Math.exp(-(kv - 0.1) / 0.16);
+      vent += 0.18 * Math.exp(-(((k - 0.4) / 0.04) ** 2));   // the "dub"
+
+    }
+    // Pressure wave reaches the great vessels a moment after the squeeze
+    const ke = k - 0.12;
+    const eject = ke > 0 ? (ke < 0.08 ? Math.sin(ke / 0.08 * Math.PI / 2) : Math.exp(-(ke - 0.08) / 0.14)) : 0;
+    return { atria, vent: Math.min(1.1, vent), eject };
+  }
+
+  const mouse = { x: 0, y: 0 }, rotS = { x: 0, y: 0 };
+  addEventListener("pointermove", e => {
+    mouse.x = e.clientX / innerWidth - 0.5;
+    mouse.y = e.clientY / innerHeight - 0.5;
+  }, { passive: true });
+
+  let life = 0;
+  function drawHeart(nowMs) {
+    if (!prog) return null;
+    const now = nowMs / 1000;
+    // The heart only moves when the sensor has found a rhythm. Otherwise it stops.
+    const synced = nowMs < syncedUntil;
+    life += ((synced ? 1 : 0) - life) * 0.04;
+    $("sync").textContent = synced ? "heart: beating on detected pulses" : "heart: stopped · no pulse detected";
+
+    const r = heartCanvas.getBoundingClientRect();
+    const d = Math.min(devicePixelRatio || 1, 1.5);
+    const w = Math.round(r.width * d), h = Math.round(r.height * d);
+    if (heartCanvas.width !== w || heartCanvas.height !== h) { heartCanvas.width = w; heartCanvas.height = h; }
+    gl.viewport(0, 0, w, h);
+
+    const sway = reduceMotion ? 0 : Math.sin(now * 0.35) * 0.32 * (0.35 + 0.65 * life);
+    rotS.x += ((sway + mouse.x * 0.7) - rotS.x) * 0.06;
+    rotS.y += ((-0.05 + mouse.y * 0.25) - rotS.y) * 0.06;
+    const b = beatShape(now);
+    gl.uniform2f(U.uRes, w, h);
+    gl.uniform1f(U.uTime, now);
+    gl.uniform1f(U.uVent, b.vent);
+    gl.uniform1f(U.uAtria, b.atria);
+    gl.uniform1f(U.uEject, b.eject);
+    gl.uniform1f(U.uLife, life);
+    gl.uniform2f(U.uRot, rotS.x - 0.25, rotS.y);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    $("floor").style.transform = `translateX(-50%) scale(${1 - 0.05 * b.vent})`;
+    return b;
+  }
+
+  // =====================================================================
+  // Waveform + averaged beat
+  // =====================================================================
+  const wave = $("wave"), wctx = wave.getContext("2d");
+  const avg = $("avg"), actx = avg.getContext("2d");
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const BRAND = css("--brand"), LINE = css("--line"), FG3 = css("--fg-3");
+
+  function fit(c) {
+    const r = c.getBoundingClientRect(), d = devicePixelRatio || 1;
+    const w = Math.round(r.width * d), h = Math.round(r.height * d);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    return { w, h, d };
+  }
+
+  let scale = 2e-4;
+  function drawWave(beatAmt) {
+    const { w, h, d } = fit(wave);
+    wctx.clearRect(0, 0, w, h);
+    const t = S.t, y = S.bp[axis], n = t.length;
+    const mid = h * 0.54, amp = h * 0.22;
+
+    wctx.strokeStyle = LINE; wctx.lineWidth = 1 * d;
+    wctx.setLineDash([2 * d, 7 * d]);
+    wctx.beginPath(); wctx.moveTo(0, mid); wctx.lineTo(w, mid); wctx.stroke();
+    wctx.setLineDash([]);
+
+    // Soft glow behind the heart that blooms on each beat
+    const glow = wctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.55);
+    glow.addColorStop(0, `rgba(255,75,43,${0.06 + 0.1 * beatAmt})`);
+    glow.addColorStop(1, "rgba(255,75,43,0)");
+    wctx.fillStyle = glow; wctx.fillRect(0, 0, w, h);
+
+    if (!n) return;
+    const tEnd = t[n - 1], tStart = tEnd - WINDOW;
+    const X = tt => (tt - tStart) / WINDOW * w;
+
+    const i0 = Math.max(0, lowerBound(t, tStart) - 1), i1 = n;
+    const vals = [];
+    for (let i = i0; i < i1; i += 2) vals.push(Math.abs(y[i]));
+    vals.sort((a, b) => a - b);
+    const target = Math.max(4e-5, (vals[Math.floor(vals.length * 0.985)] || 0) * 1.15);
+    scale += (target - scale) * 0.06;
+    $("gain").textContent = `±${Math.round(scale * 1e6)} µg`;
+
+    for (const b of beats) {
+      if (b < tStart) continue;
+      const x = X(b);
+      const g = wctx.createLinearGradient(0, mid - amp * 1.4, 0, mid + amp * 1.4);
+      g.addColorStop(0, "#ff4b2b00"); g.addColorStop(0.5, "#ff4b2b2a"); g.addColorStop(1, "#ff4b2b00");
+      wctx.fillStyle = g; wctx.fillRect(x - 1 * d, mid - amp * 1.4, 2 * d, amp * 2.8);
+    }
+
+    const path = new Path2D();
+    for (let i = i0; i < i1; i++) {
+      const v = Math.max(-1.3, Math.min(1.3, y[i] / scale));
+      i === i0 ? path.moveTo(X(t[i]), mid - v * amp) : path.lineTo(X(t[i]), mid - v * amp);
+    }
+    wctx.lineJoin = "round"; wctx.lineCap = "round";
+    wctx.save();
+    wctx.shadowColor = "#ff4b2b70"; wctx.shadowBlur = 16 * d;
+    wctx.strokeStyle = BRAND; wctx.lineWidth = 2.25 * d;
+    wctx.stroke(path);
+    wctx.restore();
+
+    // Fade both edges into the page
+    const fl = wctx.createLinearGradient(0, 0, w * 0.18, 0);
+    fl.addColorStop(0, "#ffffffff"); fl.addColorStop(1, "#ffffff00");
+    wctx.fillStyle = fl; wctx.fillRect(0, 0, w * 0.18, h);
+    const fr = wctx.createLinearGradient(w, 0, w * 0.9, 0);
+    fr.addColorStop(0, "#ffffffff"); fr.addColorStop(1, "#ffffff00");
+    wctx.fillStyle = fr; wctx.fillRect(w * 0.9, 0, w * 0.1, h);
+  }
+
+  function drawAvg() {
+    const { w, h, d } = fit(avg);
+    actx.clearRect(0, 0, w, h);
+    $("avgCount").textContent = `${ensemble.length} beat${ensemble.length === 1 ? "" : "s"}`;
+    const mid = h / 2;
+    actx.strokeStyle = LINE; actx.lineWidth = 1 * d; actx.setLineDash([2 * d, 5 * d]);
+    actx.beginPath(); actx.moveTo(0, mid); actx.lineTo(w, mid); actx.stroke(); actx.setLineDash([]);
+    actx.fillStyle = "#ff4b2b22"; actx.fillRect(PRE / (PRE + POST) * w - 1 * d, 0, 2 * d, h);
+    if (ensemble.length < 3) {
+      actx.fillStyle = FG3; actx.font = `${12 * d}px ${css("--sans")}`; actx.textAlign = "center";
+      actx.fillText("collecting beats…", w / 2, mid - 8 * d);
+      return;
+    }
+    const L = ensemble[0].length, m = new Float32Array(L);
+    for (const s of ensemble) for (let k = 0; k < L; k++) m[k] += s[k] / ensemble.length;
+    let mx = 1e-9; for (const v of m) mx = Math.max(mx, Math.abs(v));
+    actx.strokeStyle = "#ff4b2b1a"; actx.lineWidth = 1 * d;
+    for (const s of ensemble.slice(-8)) {
+      actx.beginPath();
+      for (let k = 0; k < L; k++) {
+        const x = k / (L - 1) * w, yy = mid - Math.max(-1.6, Math.min(1.6, s[k] / mx)) * h * 0.28;
+        k ? actx.lineTo(x, yy) : actx.moveTo(x, yy);
+      }
+      actx.stroke();
+    }
+    actx.strokeStyle = BRAND; actx.lineWidth = 2 * d; actx.lineJoin = "round";
+    actx.beginPath();
+    for (let k = 0; k < L; k++) {
+      const x = k / (L - 1) * w, yy = mid - m[k] / mx * h * 0.4;
+      k ? actx.lineTo(x, yy) : actx.moveTo(x, yy);
+    }
+    actx.stroke();
+  }
+
+  // =====================================================================
+  // UI
+  // =====================================================================
+  let connected = false;
+  function updateUI() {
+    const mg = motionMg();
+    const moving = connected && warm > fs && mg >= MOTION_WARN;
+    $("hold").classList.toggle("show", moving);
+    $("holdWhy").textContent = mg > 20 ? "lots of motion" : "a little too much motion";
+
+    $("motion").innerHTML = connected ? `${mg < 10 ? mg.toFixed(2) : Math.round(mg)}<small>mg</small>` : "—<small>mg</small>";
+    $("motionBar").style.width = `${Math.min(1, Math.log10(1 + mg) / Math.log10(31)) * 100}%`;
+    $("motionBar").style.background = moving ? css("--orange") : css("--green");
+    $("motionWord").textContent = !connected || warm < fs ? "—" : mg < MOTION_WARN * 0.5 ? "very still" : mg < MOTION_WARN ? "still" : "moving";
+
+    const q = Math.round(quality * 100);
+    $("quality").innerHTML = `${connected && warm > fs * 3 ? q : "—"}<small>%</small>`;
+    $("qualityBar").style.width = `${q}%`;
+    $("qualityBar").style.background = quality > 0.45 ? BRAND : FG3;
+    $("qualityWord").textContent = !connected ? "—" : warm < fs * 3 ? "warming up" : quality > 0.7 ? "rhythmic" : quality > 0.45 ? "faint rhythm" : "searching";
+
+    const b = $("bpm"), ok = bpm && quality > 0.45;
+    b.innerHTML = `${ok ? Math.round(bpm) : "—"}<small>bpm</small>`;
+    b.classList.toggle("dim", !ok);
+    $("bpmNote").textContent = !connected ? "waiting for the helper" : ok ? "estimate · not medical" : moving ? "waiting for stillness" : "listening…";
+
+    $("rate").textContent = fsMeasured ? `${Math.round(fsMeasured)} Hz` : "— Hz";
+    if (axisMode === "auto") document.querySelector('.seg [data-axis="auto"]').textContent = `Auto · ${"XYZ"[axis]}`;
+  }
+
+  let lastUI = 0;
+  function frame(nowMs) {
+    analyze();
+    const b = drawHeart(nowMs) || { vent: 0 };
+    drawWave(b.vent);
+    if (nowMs - lastUI > 100) { drawAvg(); updateUI(); lastUI = nowMs; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  document.querySelectorAll(".seg button").forEach(btn => btn.addEventListener("click", () => {
+    document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b === btn));
+    axisMode = btn.dataset.axis;
+    if (axisMode !== "auto") { axis = +axisMode; document.querySelector('.seg [data-axis="auto"]').textContent = "Auto"; }
+    ensemble.length = 0; beats.length = 0; bpm = null;
+  }));
+
+  $("copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("git clone https://github.com/rishabhknowss/macbook-heartbeat && cd macbook-heartbeat && make run");
+      $("copy").textContent = "Copied";
+      setTimeout(() => $("copy").textContent = "Copy", 1500);
+    } catch {}
+  });
+
+  $("snap").addEventListener("click", () => {
+    const W = 1600, H = 900, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H);
+    g.textAlign = "center";
+    g.fillStyle = css("--fg"); g.font = `400 62px ${css("--sans")}`;
+    g.fillText("my macbook can feel", W / 2 - 150, 120);
+    g.fillStyle = FG3; g.font = `italic 68px ${css("--serif")}`;
+    g.fillText("my heartbeat", W / 2 + 330, 120);
+    g.drawImage(wave, 0, 170, W, 620);
+    const hs = 600; g.drawImage(heartCanvas, (W - hs) / 2, 180, hs, hs);
+    g.fillStyle = FG3; g.font = `24px ${css("--sans")}`;
+    const label = bpm && quality > 0.45 ? `~${Math.round(bpm)} bpm (rough) · ` : "";
+    g.fillText(`${label}built-in accelerometer · 1–10 Hz · experimental, not a medical device`, W / 2, 850);
+    const a = document.createElement("a");
+    a.download = `heartbeat-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.png`;
+    a.href = c.toDataURL("image/png"); a.click();
+  });
+
+  // =====================================================================
+  // Stream from the local helper
+  // =====================================================================
+  function setStatus(kind, text) {
+    $("status").className = `chip ${kind}`;
+    $("statusText").textContent = text;
+  }
+  function showSetup(on) {
+    $("setup").classList.toggle("show", on);
+    document.querySelectorAll(".live-only").forEach(el => el.classList.toggle("hide", on));
+  }
+  // Served by the helper itself → same origin. Served from the web → look for the helper on localhost.
+  const local = ["localhost", "127.0.0.1"].includes(location.hostname);
+  const STREAM = local ? "/stream" : "http://localhost:8787/stream";
+  const es = new EventSource(STREAM);
+  es.onmessage = e => ingest(JSON.parse(e.data));
+  es.addEventListener("status", e => {
+    const s = JSON.parse(e.data);
+    if (s === "live") setStatus("live", "sensor live");
+    else if (s === "no-sensor") setStatus("warn", "no accelerometer found");
+    else setStatus("", s);
+  });
+  es.onopen = () => { connected = true; showSetup(false); setStatus("", "connected"); };
+  es.onerror = () => {
+    connected = false;
+    setStatus("warn", "helper not running");
+    showSetup(true);
+  };
+})();
+</script>
+</body>
+</html>
